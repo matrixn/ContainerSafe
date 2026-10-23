@@ -1,10 +1,15 @@
 //! ContainerSafe Native UI. Development preview: no backup or restore operations.
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+use containersafe::servers::{credentials::Secret, model::Server, storage};
 use serde::{Deserialize, Serialize};
 use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use std::cell::RefCell;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+mod server_ui;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -75,16 +80,11 @@ struct State {
     active: usize,
     dirty: bool,
     busy: bool,
+    server: Option<Server>,
+    secret: Secret,
 }
 
 type SharedState = Arc<Mutex<State>>;
-
-fn project_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("native/ must be located in ContainerSafe project root")
-        .to_path_buf()
-}
 
 fn empty_report() -> BackupReport {
     BackupReport {
@@ -198,28 +198,14 @@ fn reconcile(
 }
 
 fn load_state<F: FnMut(i32, &'static str)>(root: &Path, mut progress: F) -> (State, String) {
-    progress(22, "Citesc inventarul Docker salvat...");
-    let result = read_json::<BackupReport>(&root.join("backup-plan.json"));
-    let (report, message) = match result {
-        Ok(report) if report.schema_version == 1 => (report, "Loaded backup-plan.json".to_string()),
-        Ok(_) => (empty_report(), "Unsupported plan schema version".into()),
-        Err(error) => (empty_report(), format!("{error}. Run: cargo run -- plan")),
+    progress(22, "Loading server configuration...");
+    let message = match storage::Profiles::load(root) {
+        Ok(_) => "Disconnected - select a Docker server".into(),
+        Err(e) => e,
     };
-    progress(50, "Incarc selectiile pentru backup...");
-    let (selection, message) =
-        match read_json::<BackupSelection>(&root.join("backup-selection.json")) {
-            Ok(old) if old.schema_version == 1 => (reconcile(&report, &report, &old), message),
-            Ok(_) => (
-                draft(&report),
-                "Selection schema mismatch: generated a draft".into(),
-            ),
-            Err(_) if report.applications.is_empty() => (draft(&report), message),
-            Err(_) => (
-                draft(&report),
-                "No selection file: all decisions are Pending".into(),
-            ),
-        };
-    progress(76, "Reconciliez configuratia locala...");
+    let report = empty_report();
+    let selection = draft(&report);
+    progress(70, "Preparing disconnected workspace...");
     (
         State {
             report,
@@ -227,6 +213,8 @@ fn load_state<F: FnMut(i32, &'static str)>(root: &Path, mut progress: F) -> (Sta
             active: 0,
             dirty: false,
             busy: false,
+            server: None,
+            secret: Secret::default(),
         },
         message,
     )
@@ -372,8 +360,22 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
     let Some(app) = state.report.applications.get(state.active) else {
         ui.set_active_index(-1);
         ui.set_entries(ModelRc::new(VecModel::from(Vec::<DataEntry>::new())));
-        ui.set_selected_name("No backup plan loaded".into());
-        ui.set_selected_summary("Generate backup-plan.json with the existing CLI".into());
+        ui.set_selected_name(
+            if state.server.is_none() {
+                "No server connected"
+            } else {
+                "No Docker applications detected"
+            }
+            .into(),
+        );
+        ui.set_selected_summary(
+            if state.server.is_none() {
+                "Connect a Docker server from File > New Server or Servers"
+            } else {
+                "Refresh to query the selected server"
+            }
+            .into(),
+        );
         ui.set_selected_warning("Backup execution is disabled".into());
         return;
     };
@@ -438,79 +440,19 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
     ui.set_entries(ModelRc::new(VecModel::from(entries)));
 }
 
-fn executable_path(root: &Path) -> Result<PathBuf, String> {
-    let name = if cfg!(windows) {
-        "containersafe.exe"
-    } else {
-        "containersafe"
-    };
-    for folder in ["debug", "release"] {
-        let candidate = root.join("target").join(folder).join(name);
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-    Err("CLI missing. Run 'cargo build' from ContainerSafe project root first.".into())
-}
-
-fn run_cli(root: &Path, mode: &str) -> Result<std::process::Output, String> {
-    let executable = executable_path(root)?;
-    Command::new(executable)
-        .arg(mode)
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("Cannot run CLI {mode}: {error}"))
-}
-
-fn refresh_plan(root: &Path) -> Result<BackupReport, String> {
-    let output = run_cli(root, "plan")?;
-    if !output.status.success() {
-        return Err(format!(
-            "Docker discovery failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let plan: BackupReport = serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("CLI returned invalid JSON: {error}"))?;
-    if plan.schema_version != 1 || !plan.read_only {
-        return Err("Unexpected backup-plan schema or read_only=false".into());
-    }
-    // Only persist a validated response; PowerShell redirection encoding is avoided.
-    let output_json = serde_json::to_vec_pretty(&plan).map_err(|error| error.to_string())?;
-    fs::write(root.join("backup-plan.json"), output_json)
-        .map_err(|error| format!("Cannot save backup-plan.json: {error}"))?;
-    Ok(plan)
-}
-
 fn validate_saved(root: &Path) -> Result<(bool, String), String> {
-    let output = run_cli(root, "validate")?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.success() {
-        Ok((true, "Selection validated; execution NOT authorized".into()))
-    } else {
-        let pending = stdout
-            .lines()
-            .filter(|l| l.contains("still pending"))
-            .count();
-        if pending > 0 {
-            Ok((
-                false,
-                format!("{pending} pending decisions · backup not authorized"),
-            ))
+    let report: containersafe::plan::BackupReport = read_json(&root.join("backup-plan.json"))?;
+    let selection: containersafe::selection::BackupSelection =
+        read_json(&root.join("backup-selection.json"))?;
+    let errors = containersafe::selection::validate(&report, &selection);
+    Ok((
+        errors.is_empty(),
+        if errors.is_empty() {
+            "Selection valid; backup execution NOT authorized".into()
         } else {
-            Ok((
-                false,
-                format!(
-                    "Validation failed: {}",
-                    stdout
-                        .lines()
-                        .next()
-                        .unwrap_or(stderr.lines().next().unwrap_or("unknown error"))
-                ),
-            ))
-        }
-    }
+            errors.join("; ")
+        },
+    ))
 }
 
 // This runs only on the Slint UI thread, after background startup completes.
@@ -525,6 +467,7 @@ fn create_main_window(
         let guard = state.lock().expect("state mutex poisoned");
         render(&ui, &guard);
     }
+    ui.set_app_version(containersafe::VERSION.into());
     ui.set_status_message(first_status.into());
     ui.set_validation_message("Selection not verified for execution".into());
 
@@ -538,6 +481,9 @@ fn create_main_window(
             let Ok(mut guard) = state.lock() else {
                 return;
             };
+            if ui.get_dialog() != 0 {
+                return;
+            }
             if index < 0 || index as usize >= guard.report.applications.len() {
                 return;
             }
@@ -556,7 +502,7 @@ fn create_main_window(
             let Ok(mut guard) = state.lock() else {
                 return;
             };
-            if guard.busy {
+            if guard.busy || ui.get_dialog() != 0 {
                 return;
             }
             let active = guard.active;
@@ -603,13 +549,17 @@ fn create_main_window(
             let Ok(mut guard) = state.lock() else {
                 return;
             };
-            if guard.busy {
+            if guard.busy || ui.get_dialog() != 0 {
                 return;
             }
+            let Some(server) = &guard.server else {
+                return;
+            };
+            let server_root = storage::server_dir(&root, server.id);
             let save_result = serde_json::to_vec_pretty(&guard.selection)
                 .map_err(|error| error.to_string())
                 .and_then(|data| {
-                    fs::write(root.join("backup-selection.json"), data)
+                    storage::atomic_write(&server_root.join("backup-selection.json"), &data)
                         .map_err(|error| error.to_string())
                 });
             match save_result {
@@ -635,78 +585,6 @@ fn create_main_window(
         let weak = ui.as_weak();
         let state = Arc::clone(&state);
         let root = root.clone();
-        ui.on_refresh_inventory(move || {
-            let Some(ui) = weak.upgrade() else {
-                return;
-            };
-            {
-                let Ok(mut guard) = state.lock() else {
-                    return;
-                };
-                if guard.busy {
-                    return;
-                }
-                if guard.dirty {
-                    ui.set_status_message(
-                        "Save selections before refreshing the Docker inventory".into(),
-                    );
-                    return;
-                }
-                guard.busy = true;
-                render(&ui, &guard);
-                ui.set_status_message("Refreshing inventory via SSH...".into());
-            }
-            let weak = weak.clone();
-            let state = Arc::clone(&state);
-            let root = root.clone();
-            std::thread::spawn(move || {
-                let result = refresh_plan(&root);
-                let _ = weak.upgrade_in_event_loop(move |ui| {
-                    let Ok(mut guard) = state.lock() else {
-                        return;
-                    };
-                    guard.busy = false;
-                    match result {
-                        Ok(next_report) => {
-                            let previous_app = guard
-                                .report
-                                .applications
-                                .get(guard.active)
-                                .map(|a| a.application.clone());
-                            let next_selection =
-                                reconcile(&next_report, &guard.report, &guard.selection);
-                            guard.selection = next_selection;
-                            guard.report = next_report;
-                            guard.active = previous_app
-                                .and_then(|name| {
-                                    guard
-                                        .report
-                                        .applications
-                                        .iter()
-                                        .position(|a| a.application == name)
-                                })
-                                .unwrap_or(0);
-                            guard.dirty = true; // reconciling may alter the selection; save explicitly
-                            render(&ui, &guard);
-                            ui.set_status_message(
-                                "Docker inventory updated · save reconciled selections".into(),
-                            );
-                            ui.set_validation_message("Plan changed; validate again".into());
-                        }
-                        Err(error) => {
-                            render(&ui, &guard);
-                            ui.set_status_message(format!("REFRESH ERROR: {error}").into());
-                        }
-                    }
-                });
-            });
-        });
-    }
-
-    {
-        let weak = ui.as_weak();
-        let state = Arc::clone(&state);
-        let root = root.clone();
         ui.on_validate_selection(move || {
             let Some(ui) = weak.upgrade() else {
                 return;
@@ -715,11 +593,14 @@ fn create_main_window(
                 let Ok(mut guard) = state.lock() else {
                     return;
                 };
-                if guard.busy {
+                if guard.busy || ui.get_dialog() != 0 {
                     return;
                 }
                 if guard.dirty {
                     ui.set_status_message("Save changes before validation".into());
+                    return;
+                }
+                if guard.server.is_none() {
                     return;
                 }
                 guard.busy = true;
@@ -728,7 +609,14 @@ fn create_main_window(
             }
             let weak = weak.clone();
             let state = Arc::clone(&state);
-            let root = root.clone();
+            let Some(id) = state
+                .lock()
+                .ok()
+                .and_then(|s| s.server.as_ref().map(|s| s.id))
+            else {
+                return;
+            };
+            let root = storage::server_dir(&root, id);
             std::thread::spawn(move || {
                 let result = validate_saved(&root);
                 let _ = weak.upgrade_in_event_loop(move |ui| {
@@ -759,17 +647,18 @@ fn create_main_window(
         });
     }
 
+    server_ui::install(&ui, state, root);
     Ok(ui)
 }
 
 // Progress is based on completed operations, not on an artificial counter.
 enum StartupEvent {
     Progress(i32, String),
-    Loaded(State, String),
+    Loaded(Box<State>, String),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let root = project_root();
+    let root = storage::config_root().map_err(std::io::Error::other)?;
     let splash = SplashWindow::new()?;
     splash.set_loading_progress(5);
     splash.set_loading_message("Pornesc ContainerSafe...".into());
@@ -782,7 +671,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (state, message) = load_state(&worker_root, |percent, text| {
             let _ = sender.send(StartupEvent::Progress(percent, text.into()));
         });
-        let _ = sender.send(StartupEvent::Loaded(state, message));
+        let _ = sender.send(StartupEvent::Loaded(Box::new(state), message));
     });
 
     // Slint components must be created and modified on the UI thread.
@@ -810,7 +699,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StartupEvent::Loaded(state, message) => {
                     splash.set_loading_progress(88);
                     splash.set_loading_message("Pregatesc fereastra principala...".into());
-                    loaded = Some((state, message));
+                    loaded = Some((*state, message));
                 }
             }
         }

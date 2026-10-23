@@ -1,4 +1,4 @@
-use crate::{Container, detect_database, is_backup_candidate};
+use crate::{detect_database, is_backup_candidate, Container};
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

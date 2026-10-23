@@ -1,0 +1,42 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="ContainerSafe" Manufacturer="ContainerSafe" Version="$(var.ProductVersion)"
+           UpgradeCode="E29D06F0-67E0-41D3-BDA1-EA61F5A65C13" Language="1033" Scope="perMachine">
+    <SummaryInformation Description="ContainerSafe native Docker server and backup readiness manager" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of ContainerSafe is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPCOMMENTS" Value="Docker server management and read-only backup readiness" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/matrixn/ContainerSafe" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ContainerSafe">
+        <Component Id="DesktopExecutable" Guid="*">
+          <File Id="DesktopFile" Source="$(var.StageDir)/ContainerSafeDesktop.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="CliExecutable" Guid="*">
+          <File Source="$(var.StageDir)/containersafe.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="Readme" Guid="*">
+          <File Source="$(var.StageDir)/README.md" KeyPath="yes" />
+        </Component>
+        <Component Id="ThirdPartyNotices" Guid="*">
+          <File Source="$(var.StageDir)/THIRD-PARTY-NOTICES.txt" KeyPath="yes" />
+        </Component>
+        <Component Id="Shortcuts" Guid="*">
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="ContainerSafe"
+                    Target="[#DesktopFile]" WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\ContainerSafe" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="ContainerSafe" />
+    </StandardDirectory>
+    <Feature Id="Complete" Title="ContainerSafe" Level="1">
+      <ComponentRef Id="DesktopExecutable" />
+      <ComponentRef Id="CliExecutable" />
+      <ComponentRef Id="Readme" />
+      <ComponentRef Id="ThirdPartyNotices" />
+      <ComponentRef Id="Shortcuts" />
+    </Feature>
+  </Package>
+</Wix>

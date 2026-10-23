@@ -1,21 +1,20 @@
-/target
 /target/
+/native/target/
+/dist/
+/.wix/
 **/*.rs.bk
-
-# Configuratii locale si rezultate discovery
 .env
 .env.*
 !.env.example
 backup-plan.json
 backup-selection.json
-
-# Date si secrete pentru backup
+servers.json
 *.key
 *.pem
+*.ppk
 *.secret
 restic-password*
 secrets/
-
-# IDE
 .vscode/
 .idea/
+__pycache__/

@@ -1,4 +1,7 @@
 export { SplashWindow } from "splash.slint";
+import { ServerForm } from "dialogs/server-form.slint";
+import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
+export { ServerRow } from "dialogs/server-manager.slint";
 import { Button, ListView, AboutSlint } from "std-widgets.slint";
 
 export struct AppEntry {
@@ -40,7 +43,7 @@ component NavLine inherits Rectangle {
 }
 
 export component ContainerSafeWindow inherits Window {
-    title: "ContainerSafe - Backup Manager";
+    title: "ContainerSafe " + root.app-version + " — " + root.active-server;
     preferred-width: 1260px;
     preferred-height: 790px;
     min-width: 1060px;
@@ -71,6 +74,51 @@ export component ContainerSafeWindow inherits Window {
     callback save-selection();
     callback validate-selection();
 
+    in-out property <string> app-version;
+    in-out property <string> active-server: "Disconnected";
+    in-out property <int> dialog: 0;
+    in-out property <[ServerRow]> servers;
+    in-out property <int> selected-server: -1;
+    in-out property <string> form-name;
+    in-out property <string> form-host;
+    in-out property <string> form-port: "22";
+    in-out property <string> form-user;
+    in-out property <int> form-auth: 0;
+    in-out property <string> form-key;
+    in-out property <string> form-secret;
+    in-out property <bool> form-remember;
+    in-out property <int> form-docker;
+    in-out property <string> form-timeout: "10";
+    in-out property <string> connection-result: "Not tested";
+    in-out property <bool> test-busy;
+    in-out property <bool> test-passed;
+    in-out property <string> host-question;
+    in-out property <bool> host-changed;
+    callback server-action(string);
+    callback form-edited();
+    callback test-server();
+    callback save-server();
+    callback browse-key();
+    callback trust-host();
+    MenuBar {
+        Menu { title: "File";
+            MenuItem { title: "New Server..."; shortcut: @keys(Control + N); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("new"); } }
+            MenuItem { title: "Servers..."; shortcut: @keys(Control + Shift + S); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("servers"); } }
+            MenuSeparator {}
+            MenuItem { title: "Quit"; shortcut: @keys(Control + Q); activated => { root.server-action("quit"); } }
+        }
+        Menu { title: "Help";
+            MenuItem { title: "Documentation"; activated => { root.server-action("docs"); } }
+            MenuItem { title: "About ContainerSafe"; activated => { root.dialog = 4; } }
+        }
+    }
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape && root.dialog != 0 { root.server-action("cancel"); return accept; }
+            return reject;
+        }
+    FocusScope {
+    enabled: root.dialog == 0;
     HorizontalLayout {
         spacing: 0px;
         Rectangle {
@@ -99,8 +147,8 @@ export component ContainerSafeWindow inherits Window {
                         }
                         VerticalLayout {
                             spacing: 1px;
-                            Text { text: "ContainerSafe"; font-weight: 700; color: #f1f6ff; font-size: 15px; }
-                            Text { text: "BACKUP MANAGER"; color: #8da1bc; font-size: 10px; }
+                            Text { text: "ContainerSafe " + root.app-version; font-weight: 700; color: #f1f6ff; font-size: 15px; }
+                            Text { text: root.active-server; overflow: elide; color: #8da1bc; font-size: 10px; }
                         }
                     }
                 }
@@ -143,18 +191,18 @@ export component ContainerSafeWindow inherits Window {
                             horizontal-stretch: 1;
                         }
                         Button {
-                            text: "Refresh Docker";
-                            enabled: !root.loading;
+                            text: "Retry / Refresh";
+                            enabled: !root.loading && root.dialog == 0;
                             clicked => { root.refresh-inventory(); }
                         }
                         Button {
                             text: root.dirty ? "Save changes *" : "Save selections";
-                            enabled: !root.loading && root.dirty;
+                            enabled: !root.loading && root.dirty && root.dialog == 0;
                             clicked => { root.save-selection(); }
                         }
                         Button {
                             text: "Validate";
-                            enabled: !root.loading;
+                            enabled: !root.loading && root.dialog == 0;
                             clicked => { root.validate-selection(); }
                         }
                     }
@@ -339,7 +387,7 @@ export component ContainerSafeWindow inherits Window {
                                                 Button {
                                                     width: 132px;
                                                     text: entry.decision;
-                                                    enabled: !root.loading;
+                                                    enabled: !root.loading && root.dialog == 0;
                                                     clicked => { root.cycle-decision(index); }
                                                 }
                                             }
@@ -383,7 +431,7 @@ export component ContainerSafeWindow inherits Window {
                     VerticalLayout {
                         padding: 38px;
                         spacing: 18px;
-                        Text { text: "ContainerSafe Native"; color: #f5f7ff; font-size: 22px; font-weight: 700; }
+                        Text { text: "ContainerSafe Native " + root.app-version; color: #f5f7ff; font-size: 22px; font-weight: 700; }
                         Text { text: "Rust + Slint. No web browser, HTML, JavaScript, React, or Tauri runtime."; color: #b2c4d9; font-size: 14px; }
                         Text { text: "Developer preview: discovery, planning, selection and validation only. Backup execution disabled."; color: #b2c4d9; wrap: word-wrap; }
                         Text { text: "Built with Slint"; font-size: 13px; color: #9cb7d5; }
@@ -418,5 +466,56 @@ export component ContainerSafeWindow inherits Window {
                 }
             }
         }
+    }
+    }
+    // Modal scrim consumes pointer input; all application actions are also guarded in Rust.
+    if root.dialog != 0 : Rectangle {
+        background: #0009;
+        TouchArea {}
+        if root.dialog == 1 : ServerForm {
+            x: (parent.width - self.width) / 2; y: 12px;
+            width: 680px; height: parent.height - 24px;
+            server-name <=> root.form-name; host <=> root.form-host; port <=> root.form-port;
+            username <=> root.form-user; authentication <=> root.form-auth; key-path <=> root.form-key;
+            secret <=> root.form-secret; remember <=> root.form-remember; docker-access <=> root.form-docker;
+            timeout <=> root.form-timeout; result: root.connection-result; busy: root.test-busy; tested: root.test-passed;
+            edited => { root.form-edited(); } test => { root.test-server(); } save => { root.save-server(); }
+            browse => { root.browse-key(); } cancel => { root.server-action("cancel"); }
+            init => { self.focus-first(); }
+        }
+        if root.dialog == 2 : ServerManager {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: 920px; height: 470px;
+            servers: root.servers; selected <=> root.selected-server;
+            action(action) => { root.server-action(action); }
+        }
+        if root.dialog == 3 || root.dialog == 5 : Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: 690px; height: 320px; background: #16263b; border-radius: 8px;
+            VerticalLayout {
+                padding: 24px; spacing: 14px;
+                Text { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; color: #efba88; font-weight: 700; font-size: 18px; }
+                Text { text: root.host-question; wrap: word-wrap; color: #d1e1f4; }
+                HorizontalLayout {
+                    Button { text: "Cancel / Reject"; clicked => { root.server-action("cancel"); } }
+                    Button { text: root.dialog == 5 ? "Remove profile and credential" : root.host-changed ? "Approve reviewed replacement" : "Trust this host";
+                        clicked => { if root.dialog == 5 { root.server-action("confirm-remove"); } else { root.trust-host(); } }
+                    }
+                }
+            }
+        }
+        if root.dialog == 4 : Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: 560px; height: 350px; background: #16263b;
+            VerticalLayout {
+                padding: 28px; spacing: 16px;
+                Text { text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
+                Text { text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
+                AboutSlint { height: 110px; }
+                Button { text: "Close"; clicked => { root.server-action("cancel"); } }
+            }
+        }
+    }
+
     }
 }

@@ -4,6 +4,8 @@
 
 ### Discover. Audit. Protect. Recover.
 
+**Version 0.09** · Next releases increment by **0.01** (0.10, 0.11, …).
+
 **Know what your Docker applications depend on — before you need to restore them.**
 
 ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recovery project**, with a lightweight **Slint desktop interface** and a CLI. It discovers containers and Compose projects, identifies persistent data, flags backup risks, and helps build explicit, reviewable backup plans.
@@ -52,7 +54,7 @@ ContainerSafe aims to make these dependencies **visible, reviewable, and recover
 | Selection validation | ✅ Tested | A valid selection is **not** permission to execute a backup |
 | Remote preflight | 🧪 Partial | Checks current Docker mounts and in-container readability |
 | Restic lab: init, backup, integrity check, restore | ✅ Local test | Disposable Windows test data only; two-snapshot test passed |
-| Native Slint UI | 🧪 Preview | Shows local plans and invokes existing CLI for refresh/validation |
+| Native Slint UI | 🧪 Preview | Manages SSH servers and uses the shared Rust core for discovery/validation |
 | Startup splash / stage status | 🧪 Preview | Slint screen with real startup steps, not fake loading animation |
 | Production Docker backups | ⏳ Planned | Agent, destination handling, scheduling, safe execution |
 | Database-consistent full-stack restore | ⏳ Planned | Restore drills and application-level checks |
@@ -77,15 +79,17 @@ Planned refactor:
 containersafe-core → containersafe-cli / containersafe-native / containersafe-agent
 ```
 
-The desktop client currently reuses the CLI rather than calling a shared `containersafe-core` library. A dedicated Linux agent and production backup executor are future work.
+The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. A dedicated Linux agent and production backup executor are future work.
 
 ## Getting started
+
+Windows MSI and Linux DEB/tar.gz builds are automated through GitHub Actions. See [creating a GitHub release](docs/RELEASING.md). Tags use the display version, starting with `v0.09`; macOS packages are deferred.
 
 ### Prerequisites
 
 - **Rust and Cargo** (a toolchain compatible with Slint 1.18).
-- **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK.
-- **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. The development CLI currently uses a configured host alias and an existing Docker CLI path; review `src/main.rs` before connecting to your own host.
+- **Windows:** Visual Studio C++ Build Tools / MSVC, Windows SDK and native Windows Perl (for bundled OpenSSL). Put Strawberry Perl on PATH, or set `OPENSSL_SRC_PERL` to its `perl.exe`. The first build compiles OpenSSL and can take several minutes.
+- **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. Configure a server in the native app first. Connections pin the host key before authentication; Docker access is discovered using a restricted command list.
 - **For the standalone local Restic lab:** `restic` available on `PATH`.
 
 ### 1. Clone and build
@@ -106,7 +110,7 @@ cargo run -- plan
 cargo run -- preflight
 ```
 
-The CLI's remote connection is currently configured for the developer's SSH alias **`zion`**. Update your local SSH configuration and CLI connection settings before using these commands. `preflight` also requires local `backup-plan.json` and `backup-selection.json` files.
+Commands use the configured default server, or accept `--server UUID`. There is no implicit production host or SSH alias. `plan` persists its output under the selected server UUID; `draft` prints a proposed selection and `validate`/`preflight` read that server’s saved selection. CLI authentication uses remembered OS credentials or an unencrypted private key; use the desktop for session-only passwords/passphrases and host-key approval.
 
 **PowerShell 5.1 users:** plain `>` can save redirected native program output in UTF-16. Use the desktop app's **Refresh Docker** / **Save selections** buttons or write the files explicitly in UTF-8. Do not commit the generated JSON files.
 
@@ -116,7 +120,9 @@ The CLI's remote connection is currently configured for the developer's SSH alia
 cargo run --manifest-path .\native\Cargo.toml
 ```
 
-The desktop application reads `backup-plan.json` and `backup-selection.json` from the repository root. If the files are missing, the app can still open, but the inventory will be empty until refreshed.
+After the splash, first launch opens **New Docker Server**. Configure and test SSH, review the host fingerprint, then save. Later launches connect to the default server asynchronously. **File → Servers...** manages profiles and switches servers; the selected server and version are visible in the application bar. Offline servers leave the app open.
+
+Profiles live in `%APPDATA%\ContainerSafe\servers.json` on Windows, with per-server backup data under `servers/<uuid>/`. Passwords/passphrases use the OS credential store, or remain session-only when Remember is unchecked. Existing repository JSON files are never imported automatically. See [server setup, PPK integration, migration and validation](docs/SERVER_MANAGEMENT.md).
 
 ### 4. Run the isolated backup/restore lab (optional)
 
@@ -149,7 +155,8 @@ cargo run -- lab-backup
 - [x] Selection validation with risky-source checks
 - [x] Local Restic backup, integrity check, incremental snapshot, and restore test
 - [x] Native Slint desktop prototype
-- [ ] Refactor into reusable `containersafe-core`, CLI and desktop modules
+- [x] Shared Rust core for CLI and desktop, explicit server UUIDs and isolated local data
+- [x] Server manager, pinned SSH identities, OS credentials and default-server startup
 - [ ] Robust cross-platform CLI, configuration and error handling
 - [ ] Agent-based Docker host access with least-privilege considerations
 - [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies

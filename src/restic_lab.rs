@@ -59,7 +59,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     fs::write(&original, expected)?;
 
-    println!("ContainerSafe v0.7 - Restic Lab");
+    println!("ContainerSafe v{} - Restic Lab", crate::VERSION);
     println!("Local test directory: {}", lab.display());
     println!("No Synology connection will be used.");
 

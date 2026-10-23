@@ -1,6 +1,6 @@
 use crate::plan::BackupReport;
 use crate::selection::{self, BackupSelection};
-use crate::{Container, DOCKER, ssh_command};
+use crate::{servers::connection::Connection, Container};
 
 use std::error::Error;
 use std::io;
@@ -22,22 +22,26 @@ fn application_of(container: &Container) -> String {
         .unwrap_or_else(|| format!("standalone/{name}"))
 }
 
-fn check_readable(container: &Container, path: &str) -> bool {
+fn check_readable(connection: &Connection, container: &Container, path: &str) -> bool {
     let name = container.name.trim_start_matches('/');
 
     // Folosim doar comenzi de verificare, fara scriere.
     // Argumentele sunt escapate pentru shell-ul SSH.
     let command = format!(
-        "{DOCKER} exec {} sh -c \
+        "exec {} sh -c \
          'test -e \"$1\" && test -r \"$1\"' sh {}",
         shell_quote(name),
         shell_quote(path)
     );
 
-    ssh_command(&command).is_ok()
+    connection.docker(&command).is_ok()
 }
 
-pub fn run(report: &BackupReport, selection: &BackupSelection) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    connection: &Connection,
+    report: &BackupReport,
+    selection: &BackupSelection,
+) -> Result<(), Box<dyn Error>> {
     let errors = selection::validate(report, selection);
 
     if !errors.is_empty() {
@@ -50,14 +54,14 @@ pub fn run(report: &BackupReport, selection: &BackupSelection) -> Result<(), Box
 
     // Recitim inventarul Docker, nu ne bazam doar
     // pe JSON-ul generat anterior.
-    let containers = crate::discover()?;
+    let containers = crate::discover(connection).map_err(io::Error::other)?;
 
     let mut selected_count = 0;
     let mut passed = 0;
     let mut blocked = 0;
 
     println!("========================================");
-    println!("ContainerSafe v0.6 - Backup Preflight");
+    println!("ContainerSafe v{} - Backup Preflight", crate::VERSION);
     println!("========================================");
     println!("Mode: READ-ONLY");
     println!("No backup operations will be executed.");
@@ -123,7 +127,7 @@ pub fn run(report: &BackupReport, selection: &BackupSelection) -> Result<(), Box
                 continue;
             }
 
-            if check_readable(container, &mount.destination) {
+            if check_readable(connection, container, &mount.destination) {
                 println!("  [PASS] Mounted path exists and is readable");
                 passed += 1;
             } else {

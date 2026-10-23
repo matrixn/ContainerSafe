@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ContainerSafe
+Comment=Docker server management and backup readiness
+Exec=containersafe-gui
+Icon=containersafe
+Terminal=false
+Categories=System;Utility;
+StartupNotify=true

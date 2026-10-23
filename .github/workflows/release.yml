@@ -1,0 +1,167 @@
+name: Build installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installers-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: ${{ github.workspace }}/target
+  CARGO_BUILD_JOBS: '2'
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || github.ref }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Validate version and tag
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
+        run: python scripts/release_metadata.py --tag "$RELEASE_TAG"
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: windows-x64
+          - os: ubuntu-22.04
+            platform: linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      DOTNET_ROLL_FORWARD: Major
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || github.ref }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config perl libdbus-1-dev libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libudev-dev libinput-dev libgbm-dev libegl1-mesa-dev libgl1-mesa-dev desktop-file-utils xvfb
+      - name: Native Windows Perl for OpenSSL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (!(Test-Path -LiteralPath $perl)) { throw 'Native Windows Perl is missing from the runner image' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: runner.os == 'Windows'
+        with:
+          dotnet-version: '8.0.x'
+      - name: Rust toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: installers-${{ runner.os }}-rust-1.99.1-${{ hashFiles('Cargo.lock', 'native/Cargo.lock') }}
+      - name: Check and test core and native application
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --check
+          cargo fmt --manifest-path native/Cargo.toml --check
+          cargo test --locked
+          cargo test --locked --manifest-path native/Cargo.toml
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --manifest-path native/Cargo.toml -- -D warnings
+          python -m pip install paramiko==5.1.0
+          cargo test --locked --test ssh_integration -- --ignored
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS='-C target-feature=+crt-static'
+            cargo build --release --locked --target x86_64-pc-windows-msvc
+            cargo build --release --locked --target x86_64-pc-windows-msvc --manifest-path native/Cargo.toml
+            target/x86_64-pc-windows-msvc/release/containersafe.exe --version
+          else
+            cargo build --release --locked
+            cargo build --release --locked --manifest-path native/Cargo.toml
+            target/release/containersafe --version
+          fi
+      - name: Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install wix --version 5.0.2 --tool-path "$env:RUNNER_TEMP/wix"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/package-windows.ps1 -Wix "$env:RUNNER_TEMP/wix/wix.exe" -BinaryDirectory target/x86_64-pc-windows-msvc/release
+          python scripts/smoke_gui.py target/package-windows/ContainerSafeDesktop.exe
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          desktop-file-validate packaging/linux/containersafe.desktop
+          bash scripts/package-linux.sh
+          ldd target/release/containersafe-native
+          ldd target/release/containersafe
+          xvfb-run -a python scripts/smoke_gui.py target/release/containersafe-native
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            dist/*.msi
+            dist/*.deb
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  attach-release:
+    needs: [version, build]
+    if: github.event_name == 'release' || (github.event_name == 'push' && github.ref_type == 'tag')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installers-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -- *.msi *.deb *.tar.gz > SHA256SUMS.txt
+      - name: Attach installers to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --generate-notes --title "ContainerSafe $VERSION"
+          fi
+          gh release upload "$TAG" dist/*.msi dist/*.deb dist/*.tar.gz dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

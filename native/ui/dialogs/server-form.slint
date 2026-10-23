@@ -1,0 +1,84 @@
+import { Button, LineEdit, CheckBox, ComboBox, RadioGroup, ScrollView } from "std-widgets.slint";
+
+export component ServerForm inherits Rectangle {
+    in-out property <string> server-name;
+    in-out property <string> host;
+    in-out property <string> port: "22";
+    in-out property <string> username;
+    in-out property <int> authentication: 0;
+    in-out property <string> key-path;
+    in-out property <string> secret;
+    in-out property <bool> remember;
+    in-out property <int> docker-access: 0;
+    in-out property <string> timeout: "10";
+    in property <string> result;
+    in property <bool> busy;
+    in property <bool> tested;
+    callback edited;
+    callback browse;
+    callback test;
+    callback save;
+    callback cancel;
+    background: #16263b;
+    border-radius: 8px;
+    VerticalLayout {
+        padding: 22px;
+        spacing: 8px;
+        Text { text: "Docker Server"; font-size: 22px; font-weight: 700; color: #f0f5ff; }
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: "Server name"; }
+                name := LineEdit { text <=> root.server-name; edited => { root.edited(); } }
+                Text { text: "Hostname / IP address"; }
+                LineEdit { text <=> root.host; edited => { root.edited(); } }
+                HorizontalLayout {
+                    Text { text: "SSH port"; }
+                    LineEdit { text <=> root.port; input-type: number; edited => { root.edited(); } }
+                    Text { text: "Timeout (s)"; }
+                    LineEdit { text <=> root.timeout; input-type: number; edited => { root.edited(); } }
+                }
+                Text { text: "SSH username"; }
+                LineEdit { text <=> root.username; edited => { root.edited(); } }
+                RadioGroup {
+                    orientation: vertical;
+                    selected(value) => {
+                        if (value == "Username & Password" && root.authentication != 0) || (value == "OpenSSH Private Key" && root.authentication != 2) || (value != "Username & Password" && value != "OpenSSH Private Key" && root.authentication != 1) {
+                            root.authentication = value == "Username & Password" ? 0 : value == "OpenSSH Private Key" ? 2 : 1;
+                            root.edited();
+                        }
+                    }
+                    RadioButton { text: "Username & Password"; checked: root.authentication == 0; }
+                    RadioButton { text: "PuTTY Private Key (.ppk) — encrypted export integration"; checked: root.authentication == 1; }
+                    RadioButton { text: "OpenSSH Private Key"; checked: root.authentication == 2; }
+                }
+                if root.authentication != 0 : HorizontalLayout {
+                    LineEdit { text <=> root.key-path; placeholder-text: "Private key path"; edited => { root.edited(); } }
+                    Button { text: "Browse..."; clicked => { root.browse(); } }
+                }
+                if root.authentication != 0 : Text {
+                    text: "Your private key stays on this computer. Its public key must be authorized on the remote server.";
+                    wrap: word-wrap; color: #a8bed8; font-size: 11px;
+                }
+                if root.authentication == 1 : Text {
+                    text: "Open the PPK in PuTTYgen, export an encrypted OpenSSH key, then choose OpenSSH above. No automatic conversion.";
+                    wrap: word-wrap; color: #efbf70;
+                }
+                Text { text: root.authentication == 0 ? "Password" : "Key passphrase (optional)"; }
+                LineEdit { text <=> root.secret; input-type: password; edited => { root.edited(); } }
+                CheckBox { text: "Remember in operating-system credential store"; checked <=> root.remember; toggled => { root.edited(); } }
+                Text { text: "Docker access"; }
+                ComboBox { model: ["Automatic", "Direct Docker CLI", "Passwordless sudo -n"]; current-index <=> root.docker-access; selected(value) => { root.edited(); } }
+                Text { text: root.result; wrap: word-wrap; color: #b7d1ee; min-height: 60px; }
+            }
+        }
+        HorizontalLayout {
+            Button { text: root.busy ? "Testing..." : "Test Connection"; enabled: !root.busy; clicked => { root.test(); } }
+            Rectangle { horizontal-stretch: 1; }
+            Button { text: "Cancel"; clicked => { root.cancel(); } }
+            Button { text: "Save"; enabled: root.tested && !root.busy; clicked => { root.save(); } }
+        }
+    }
+    public function focus-first() { name.focus(); }
+}

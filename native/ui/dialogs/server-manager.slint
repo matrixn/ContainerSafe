@@ -1,0 +1,43 @@
+import { Button, ListView } from "std-widgets.slint";
+export struct ServerRow { name: string, host: string, status: string, last-opened: string, default-server: bool }
+export component ServerManager inherits Rectangle {
+    in property <[ServerRow]> servers;
+    in-out property <int> selected: -1;
+    callback action(string);
+    background: #16263b;
+    border-radius: 8px;
+    VerticalLayout {
+        padding: 22px;
+        spacing: 12px;
+        Text { text: "Servers"; font-size: 22px; font-weight: 700; color: #f0f5ff; }
+        HorizontalLayout {
+            Text { text: "Name"; width: 190px; }
+            Text { text: "Host"; width: 200px; }
+            Text { text: "Status"; width: 120px; }
+            Text { text: "Last opened"; }
+        }
+        ListView {
+            for server[i] in root.servers: Rectangle {
+                height: 44px;
+                background: root.selected == i ? #244d79 : (Math.mod(i,2) == 0 ? #1c2d43 : #18283d);
+                HorizontalLayout {
+                    padding: 8px;
+                    Button { width: 182px; text: (server.default-server ? "★ " : "") + server.name; clicked => { root.selected = i; } }
+                    Text { text: server.host; width: 200px; overflow: elide; vertical-alignment: center; }
+                    Text { text: server.status; width: 120px; vertical-alignment: center; }
+                    Text { text: server.last-opened; vertical-alignment: center; }
+                }
+            }
+        }
+        Text { text: "★ = Default server. Opening a server preserves the default preference."; color: #a8bed8; }
+        HorizontalLayout {
+            Button { text: "New"; clicked => { root.action("new"); } }
+            Button { text: "Edit"; enabled: root.selected >= 0; clicked => { root.action("edit"); } }
+            Button { text: "Remove"; enabled: root.selected >= 0; clicked => { root.action("remove"); } }
+            Button { text: "Set Default"; enabled: root.selected >= 0; clicked => { root.action("default"); } }
+            Rectangle { horizontal-stretch: 1; }
+            Button { text: "Cancel"; clicked => { root.action("cancel"); } }
+            Button { text: "Open"; enabled: root.selected >= 0; clicked => { root.action("open"); } }
+        }
+    }
+}
