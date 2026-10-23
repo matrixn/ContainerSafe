@@ -15,6 +15,15 @@ pub struct Profiles {
 }
 
 pub fn config_root() -> Result<PathBuf, String> {
+    // Explicit process-local override for isolated packaging/startup checks.
+    // Windows known-folder APIs do not necessarily follow APPDATA overrides.
+    if let Some(value) = std::env::var_os("CONTAINERSAFE_CONFIG_DIR") {
+        let path = PathBuf::from(value);
+        if !path.is_absolute() {
+            return Err("CONTAINERSAFE_CONFIG_DIR must be an absolute path".into());
+        }
+        return Ok(path);
+    }
     directories::BaseDirs::new()
         .map(|d| d.config_dir().join("ContainerSafe"))
         .ok_or_else(|| "No platform configuration directory available".into())

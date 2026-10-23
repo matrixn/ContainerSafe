@@ -58,6 +58,8 @@ Windows CI builds use the static MSVC CRT, so a separately installed Visual C++ 
 
 Neither installer configures Docker, grants remote sudo access, imports local backup plans, bundles private credentials, or installs an SSH key. The local Restic laboratory requires a separately installed `restic` executable; Restic is not bundled.
 
+The GUI startup check uses a temporary `CONTAINERSAFE_CONFIG_DIR` so it cannot load existing server profiles, including on Windows where known-folder APIs can ignore an `APPDATA` environment override. This optional process-local override requires an absolute path and leaves the normal OS configuration directory unchanged.
+
 ## Local package validation
 
 Windows build prerequisites are documented in [SERVER_MANAGEMENT.md](SERVER_MANAGEMENT.md). For this prepared workspace, optionally dot-source `scripts/use-local-build-tools.ps1 -UseOpenSslCache` first. Use Python 3.11+ for the release helper scripts.

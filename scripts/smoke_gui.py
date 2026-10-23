@@ -9,6 +9,7 @@ with tempfile.TemporaryDirectory(prefix="containersafe-startup-") as directory:
     root = Path(directory)
     environment = os.environ.copy()
     environment["SLINT_BACKEND"] = "winit-software"
+    environment["CONTAINERSAFE_CONFIG_DIR"] = str(root / "config")
     for variable, child in [("APPDATA", "roaming"), ("LOCALAPPDATA", "local"), ("XDG_CONFIG_HOME", "config")]:
         folder = root / child
         folder.mkdir()
