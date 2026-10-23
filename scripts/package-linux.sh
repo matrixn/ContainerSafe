@@ -29,6 +29,6 @@ Description: Native Docker server and backup readiness manager
  host-key verification and read-only backup planning. Includes the CLI.
 EOF
 dpkg-deb --root-owner-group --build "$stage" "dist/ContainerSafe-$version-linux-amd64.deb"
-tar -C "$stage" -czf "dist/ContainerSafe-$version-linux-x64.tar.gz" usr
+tar --sort=name --owner=0 --group=0 --numeric-owner -C "$stage" -czf "dist/ContainerSafe-$version-linux-x64.tar.gz" usr
 dpkg-deb --info "dist/ContainerSafe-$version-linux-amd64.deb"
 dpkg-deb --contents "dist/ContainerSafe-$version-linux-amd64.deb"

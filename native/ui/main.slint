@@ -509,8 +509,8 @@ export component ContainerSafeWindow inherits Window {
             width: 560px; height: 350px; background: #16263b;
             VerticalLayout {
                 padding: 28px; spacing: 16px;
-                Text { text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
-                Text { text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
+                Text { color: #f0f5ff; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
+                Text { color: #b2c4d9; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
                 AboutSlint { height: 110px; }
                 Button { text: "Close"; clicked => { root.server-action("cancel"); } }
             }

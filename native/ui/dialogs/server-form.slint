@@ -29,17 +29,17 @@ export component ServerForm inherits Rectangle {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                Text { text: "Server name"; }
+                Text { color: #e9f2ff; text: "Server name"; }
                 name := LineEdit { text <=> root.server-name; edited => { root.edited(); } }
-                Text { text: "Hostname / IP address"; }
+                Text { color: #e9f2ff; text: "Hostname / IP address"; }
                 LineEdit { text <=> root.host; edited => { root.edited(); } }
                 HorizontalLayout {
-                    Text { text: "SSH port"; }
+                    Text { color: #e9f2ff; text: "SSH port"; }
                     LineEdit { text <=> root.port; input-type: number; edited => { root.edited(); } }
-                    Text { text: "Timeout (s)"; }
+                    Text { color: #e9f2ff; text: "Timeout (s)"; }
                     LineEdit { text <=> root.timeout; input-type: number; edited => { root.edited(); } }
                 }
-                Text { text: "SSH username"; }
+                Text { color: #e9f2ff; text: "SSH username"; }
                 LineEdit { text <=> root.username; edited => { root.edited(); } }
                 RadioGroup {
                     orientation: vertical;
@@ -65,10 +65,10 @@ export component ServerForm inherits Rectangle {
                     text: "Open the PPK in PuTTYgen, export an encrypted OpenSSH key, then choose OpenSSH above. No automatic conversion.";
                     wrap: word-wrap; color: #efbf70;
                 }
-                Text { text: root.authentication == 0 ? "Password" : "Key passphrase (optional)"; }
+                Text { color: #e9f2ff; text: root.authentication == 0 ? "Password" : "Key passphrase (optional)"; }
                 LineEdit { text <=> root.secret; input-type: password; edited => { root.edited(); } }
                 CheckBox { text: "Remember in operating-system credential store"; checked <=> root.remember; toggled => { root.edited(); } }
-                Text { text: "Docker access"; }
+                Text { color: #e9f2ff; text: "Docker access"; }
                 ComboBox { model: ["Automatic", "Direct Docker CLI", "Passwordless sudo -n"]; current-index <=> root.docker-access; selected(value) => { root.edited(); } }
                 Text { text: root.result; wrap: word-wrap; color: #b7d1ee; min-height: 60px; }
             }
