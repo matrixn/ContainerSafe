@@ -1,0 +1,21 @@
+/target
+/target/
+**/*.rs.bk
+
+# Configuratii locale si rezultate discovery
+.env
+.env.*
+!.env.example
+backup-plan.json
+backup-selection.json
+
+# Date si secrete pentru backup
+*.key
+*.pem
+*.secret
+restic-password*
+secrets/
+
+# IDE
+.vscode/
+.idea/
