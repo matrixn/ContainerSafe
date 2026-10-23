@@ -1,0 +1,15 @@
+# Adauga liniile relevante in .gitignore existent; nu suprascrie tot fisierul.
+/target/
+/native/target/
+/desktop/node_modules/
+/desktop/src-tauri/target/
+backup-plan.json
+backup-selection.json
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+restic-password*
+*.secret

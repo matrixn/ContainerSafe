@@ -1,0 +1,196 @@
+<div align="center">
+
+# 🛡️ ContainerSafe
+
+### Discover. Audit. Protect. Recover.
+
+**Know what your Docker applications depend on — before you need to restore them.**
+
+ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recovery project**, with a lightweight **Slint desktop interface** and a CLI. It discovers containers and Compose projects, identifies persistent data, flags backup risks, and helps build explicit, reviewable backup plans.
+
+[![Rust](https://img.shields.io/badge/Rust-2021%20edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Slint](https://img.shields.io/badge/GUI-Slint%201.18-1565C0)](https://slint.dev/)
+[![Docker](https://img.shields.io/badge/Target-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+![Status](https://img.shields.io/badge/Status-Early%20Preview-F59E0B)
+![Backup](https://img.shields.io/badge/Production%20backup-Not%20ready-B91C1C)
+
+[Overview](#why-containersafe) · [Features](#current-capabilities) · [Getting started](#getting-started) · [Roadmap](#roadmap) · [Contribute](#contributing)
+
+![ContainerSafe splash screen](native/assets/splash.png)
+
+*Splash screen concept and native UI — interface artwork currently includes Romanian copy. English localization is planned.*
+
+</div>
+
+> [!IMPORTANT]
+> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. The Restic backup/restore integration is currently a **local disposable-file laboratory**. Automated Docker backups, database-consistent production snapshots, and full-stack recovery are **not implemented or validated**. Keep using your established backup strategy.
+
+## Why ContainerSafe?
+
+A running Docker container is not a backup. Recovering a self-hosted application may require more than its image: bind mounts, named volumes, database dumps, Compose YAML, environment files, and services outside Docker.
+
+ContainerSafe aims to make these dependencies **visible, reviewable, and recoverable** — without silently assuming that a mounted directory is safe to copy or that a successful archive guarantees a working restore.
+
+### Designed for
+
+- 🏠 **Self-hosters & homelabs** running Docker Compose stacks.
+- 🗄️ **NAS owners** who want an inventory of persistent application data.
+- 🧑‍💻 **Developers** maintaining several Docker services.
+- 🛠️ **Small teams** seeking clearer backup and restore procedures.
+
+## Current capabilities
+
+| Capability | Status | Notes |
+|---|---|---|
+| Docker container discovery | ✅ Tested | Lists running and stopped containers over SSH |
+| Compose project grouping | ✅ Tested | Uses Docker Compose labels; standalone containers are separate |
+| Bind mount & named volume inventory | ✅ Tested | Classifies candidate sources, without assuming completeness |
+| Database risk detection | ✅ Basic | Recognizes common PostgreSQL / MySQL / MariaDB / Redis image patterns |
+| Backup readiness audit | ✅ Basic | Flags missing configuration and consistency requirements |
+| Backup plan JSON | ✅ Tested | Generates a schema-versioned, read-only proposal |
+| Explicit include/exclude/dump selection | ✅ Tested | Requires decisions; prevents naive raw PostgreSQL volume selection |
+| Selection validation | ✅ Tested | A valid selection is **not** permission to execute a backup |
+| Remote preflight | 🧪 Partial | Checks current Docker mounts and in-container readability |
+| Restic lab: init, backup, integrity check, restore | ✅ Local test | Disposable Windows test data only; two-snapshot test passed |
+| Native Slint UI | 🧪 Preview | Shows local plans and invokes existing CLI for refresh/validation |
+| Startup splash / stage status | 🧪 Preview | Slint screen with real startup steps, not fake loading animation |
+| Production Docker backups | ⏳ Planned | Agent, destination handling, scheduling, safe execution |
+| Database-consistent full-stack restore | ⏳ Planned | Restore drills and application-level checks |
+
+**Principle:** *A successful snapshot is not the same thing as a successful restore.*
+
+## Architecture
+
+```text
+ContainerSafe (Rust)
+│
+├── CLI                       # Discover, audit, plan, validate, preflight
+│   └── SSH → Docker Engine   # Current discovery connection
+│
+├── native/                   # Slint desktop (no browser/WebView)
+│   ├── ui/                   # Native view definitions + splash
+│   └── src/                  # Rust UI orchestration
+│
+└── Restic lab                # Local experimental backup/restore tests
+
+Planned refactor:
+containersafe-core → containersafe-cli / containersafe-native / containersafe-agent
+```
+
+The desktop client currently reuses the CLI rather than calling a shared `containersafe-core` library. A dedicated Linux agent and production backup executor are future work.
+
+## Getting started
+
+### Prerequisites
+
+- **Rust and Cargo** (a toolchain compatible with Slint 1.18).
+- **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK.
+- **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. The development CLI currently uses a configured host alias and an existing Docker CLI path; review `src/main.rs` before connecting to your own host.
+- **For the standalone local Restic lab:** `restic` available on `PATH`.
+
+### 1. Clone and build
+
+```powershell
+git clone https://github.com/matrixn/ContainerSafe.git
+cd ContainerSafe
+cargo build
+cargo test
+```
+
+### 2. Try the CLI
+
+```powershell
+cargo run -- discover
+cargo run -- audit
+cargo run -- plan
+cargo run -- preflight
+```
+
+The CLI's remote connection is currently configured for the developer's SSH alias **`zion`**. Update your local SSH configuration and CLI connection settings before using these commands. `preflight` also requires local `backup-plan.json` and `backup-selection.json` files.
+
+**PowerShell 5.1 users:** plain `>` can save redirected native program output in UTF-16. Use the desktop app's **Refresh Docker** / **Save selections** buttons or write the files explicitly in UTF-8. Do not commit the generated JSON files.
+
+### 3. Run the native Slint desktop
+
+```powershell
+cargo run --manifest-path .\native\Cargo.toml
+```
+
+The desktop application reads `backup-plan.json` and `backup-selection.json` from the repository root. If the files are missing, the app can still open, but the inventory will be empty until refreshed.
+
+### 4. Run the isolated backup/restore lab (optional)
+
+```powershell
+restic version
+cargo run -- lab-backup
+```
+
+**Lab only:** the command creates disposable fixture data in a temporary Windows directory and tests Restic against that data. The lab's hard-coded demonstration password is **not suitable for real data**.
+
+## Example workflow
+
+```text
+1. Discover Docker services
+2. Audit mounts and possible databases
+3. Review the generated backup plan
+4. Select sources and database strategies
+5. Validate decisions
+6. [Future] Run full preflight and backup
+7. [Future] Verify an isolated restore
+```
+
+> [!WARNING]
+> Do not use the current manifest as proof that all application data has been found. External databases, `.env` files, Compose overlays, large media directories, and application-level consistency must be checked separately.
+
+## Roadmap
+
+- [x] Read-only Docker discovery and Compose grouping
+- [x] Backup readiness analysis and JSON plans
+- [x] Selection validation with risky-source checks
+- [x] Local Restic backup, integrity check, incremental snapshot, and restore test
+- [x] Native Slint desktop prototype
+- [ ] Refactor into reusable `containersafe-core`, CLI and desktop modules
+- [ ] Robust cross-platform CLI, configuration and error handling
+- [ ] Agent-based Docker host access with least-privilege considerations
+- [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies
+- [ ] PostgreSQL-consistent backup adapter and disposable integration tests
+- [ ] Restic destination management, scheduling and retention
+- [ ] Isolated application restore verification
+- [ ] Linux/macOS desktop testing and packaged releases
+
+Suggestions and use cases are welcome in [GitHub Issues](https://github.com/matrixn/ContainerSafe/issues).
+
+## Security by design
+
+- Discovery and audit commands are **read-only**.
+- Docker socket access is **high privilege**; never expose it publicly.
+- Socket mounts and other host resources are excluded from candidate data backups.
+- Plans and selections are reviewable, and validation **does not authorize execution**.
+- Never commit `.env`, SSH keys, repository passwords, generated manifests, or customer data.
+- Test restores using disposable fixtures, not live production volumes.
+
+For sensitive reports, see [SECURITY.md](SECURITY.md). Avoid publishing credentials or host inventory in public issues.
+
+## Contributing
+
+This is an early preview; feedback, reproducible bug reports, Windows/Linux compatibility notes and design discussions are especially helpful.
+
+- 🐛 [Report a bug](https://github.com/matrixn/ContainerSafe/issues/new?template=bug_report.yml)
+- 💡 [Suggest a feature](https://github.com/matrixn/ContainerSafe/issues/new?template=feature_request.yml)
+- ⭐ [Star ContainerSafe](https://github.com/matrixn/ContainerSafe) to follow its development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
+
+## License and distribution
+
+**License not selected yet.** Until a `LICENSE` file is published, do not assume that the repository grants permission to redistribute, modify, or commercially use its contents. The Slint framework has its own licensing terms; these must also be reviewed before distributing the desktop application.
+
+---
+
+<div align="center">
+
+**ContainerSafe — built for people who self-host, and care about recovering what they run.**
+
+[⭐ Star](https://github.com/matrixn/ContainerSafe) · [🐛 Issues](https://github.com/matrixn/ContainerSafe/issues)
+
+</div>

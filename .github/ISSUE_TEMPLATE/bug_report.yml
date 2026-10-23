@@ -1,0 +1,38 @@
+name: Bug report
+description: Report a reproducible ContainerSafe bug (do not attach secrets or private inventory)
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for reporting! Please redact usernames, hostnames, `.env` values, credentials, API keys and NAS paths."
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Explain the bug and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Use a disposable test environment where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Windows 11, rustc 1.xx, Slint 1.18.x, Docker xx"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      render: shell
