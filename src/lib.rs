@@ -1,4 +1,6 @@
+pub mod agent;
 pub mod plan;
+#[cfg(feature = "server-management")]
 pub mod preflight;
 pub mod restic;
 pub mod restic_lab;
@@ -7,8 +9,9 @@ pub mod selection;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+#[cfg(feature = "server-management")]
 pub mod servers;
-pub const VERSION: &str = "0.12";
+pub const VERSION: &str = "0.15";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {
@@ -58,6 +61,7 @@ struct Mount {
     read_write: bool,
 }
 
+#[cfg(feature = "server-management")]
 pub fn discover(connection: &servers::connection::Connection) -> Result<Vec<Container>, String> {
     let ids = connection.docker("ps -a -q")?;
     let ids: Vec<_> = ids.lines().filter(|s| !s.is_empty()).collect();

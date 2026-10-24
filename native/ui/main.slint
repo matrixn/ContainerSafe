@@ -1,63 +1,75 @@
 import { SelectableText } from "selectable-text.slint";
+import { Theme, ActionButton as Button, ChoiceBox as ComboBox } from "theme.slint";
 export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
 export { ServerRow } from "dialogs/server-manager.slint";
-import { Button, ListView, AboutSlint } from "std-widgets.slint";
-
-export struct AppEntry {
-    name: string,
-    note: string,
-    containers: int,
-    sources: int,
-    dbs: int,
-    needs-review: bool,
-}
-
-export struct DataEntry {
-    title: string,
-    location: string,
-    detail: string,
-    decision: string,
-    database: bool,
-    caution: bool,
-}
-
+import { ListView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
+export struct TreeEntry { key: string, name: string, note: string, depth: int, branch: bool, expanded: bool, selected: bool, app-index: int, container: string }
+export struct PlanEntry { name: string, kind: string, containers: int, selected: int, excluded: int, pending: int, app-index: int }
+export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int }
 component NavLine inherits Rectangle {
-    in property <string> label;
-    in property <bool> active;
-    callback pressed;
-    height: 42px;
-    background: active ? #213550 : transparent;
-    border-radius: 6px;
-    Text {
-        x: 16px;
-        width: parent.width - 20px;
-        height: parent.height;
-        text: label;
-        color: active ? #ffffff : #9aaec6;
-        font-size: 13px;
-        font-weight: active ? 700 : 450;
-        vertical-alignment: center;
-    }
-    TouchArea { clicked => { root.pressed(); } }
+    in property <string> label; in property <bool> active; callback pressed;
+    height: 40px; border-radius: 7px;
+    background: root.active ? #e2f1f5 : touch.has-hover ? #edf3f8 : transparent;
+    accessible-role: button; accessible-label: root.label; accessible-action-default => { root.pressed(); }
+    forward-focus: focus;
+    focus := FocusScope { key-pressed(event) => { if event.text == Key.Return || event.text == " " { root.pressed(); return accept; } return reject; } }
+    Text { x: 14px; width: parent.width - 24px; text: root.label; color: root.active ? #145a70 : #596f85; font-size: 13px; font-weight: root.active ? 700 : 500; vertical-alignment: center; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.pressed(); } }
 }
-
+component Metric inherits Rectangle {
+    in property <string> label; in property <int> value; in property <color> tint: #176b83;
+    height: 76px; background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line;
+    HorizontalLayout { padding: 16px; spacing: 12px;
+        Rectangle { width: 4px; border-radius: 2px; background: root.tint; }
+        VerticalLayout { spacing: 3px;
+            SelectableText { text: root.value; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
+            SelectableText { text: root.label; text-color: Theme.muted; font-size: 12px; }
+        }
+    }
+}
+component TreeLine inherits Rectangle {
+    in property <TreeEntry> entry; callback selected; callback toggled;
+    height: 36px; border-radius: 6px;
+    background: root.entry.selected ? #e1f1f5 : touch.has-hover ? #f0f5fa : transparent;
+    accessible-role: button; accessible-label: root.entry.name; accessible-action-default => { root.selected(); }
+    forward-focus: focus;
+    focus := FocusScope { key-pressed(event) => {
+        if event.modifiers.control && (event.text == "c" || event.text == "C") { copy-label.copy-all(); return accept; }
+        if event.text == Key.Return || event.text == " " { root.selected(); return accept; }
+        if root.entry.branch && ((event.text == Key.LeftArrow && root.entry.expanded) || (event.text == Key.RightArrow && !root.entry.expanded)) { root.toggled(); return accept; }
+        return reject;
+    } }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.selected(); } }
+    HorizontalLayout { padding-left: 8px + root.entry.depth * 16px; padding-right: 12px; spacing: 5px;
+        Rectangle { width: 23px;
+            if root.entry.branch : Image { x: 6px; y: (parent.height - 12px) / 2; width: 12px; height: 12px; source: root.entry.expanded ? @image-url("../assets/icons/chevron-down.svg") : @image-url("../assets/icons/chevron-right.svg"); image-fit: contain; }
+            if !root.entry.branch : Text { text: "·"; color: #8a9cad; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
+            if root.entry.branch : TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.toggled(); } }
+        }
+        Text { text: root.entry.name; color: root.entry.selected ? #145a70 : root.entry.depth == 0 ? #314a63 : #4d6379; font-weight: root.entry.selected || root.entry.branch ? 650 : 450; font-size: 13px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
+        Text { text: root.entry.note; color: #8494a5; font-size: 11px; vertical-alignment: center; }
+    }
+    copy-label := SelectableText { visible: false; text: root.entry.name; }
+}
 export component ContainerSafeWindow inherits Window {
     title: "ContainerSafe " + root.app-version + " — " + root.active-server;
     icon: @image-url("../assets/icons/containersafe.png");
-    preferred-width: 1260px;
-    preferred-height: 790px;
-    min-width: 1060px;
-    min-height: 610px;
-    background: #0d1522;
-    default-font-family: "Segoe UI";
-    default-font-size: 13px;
-
-    in-out property <[AppEntry]> applications: [];
-    in-out property <[DataEntry]> entries: [];
+    preferred-width: 1420px; preferred-height: 880px; min-width: 1100px; min-height: 680px;
+    background: Theme.canvas; default-font-family: "Segoe UI"; default-font-size: 13px;
+    in-out property <[TreeEntry]> tree-model;
+    in-out property <[DataEntry]> entries;
+    in-out property <[PlanEntry]> plan-model;
+    in-out property <int> selected-operations: 0;
+    in-out property <int> pending-decisions: 0;
+    in-out property <int> excluded-decisions: 0;
+    in-out property <string> filter-text;
+    in-out property <int> entry-kind: 0;
+    callback choose-decision(int, int);
+    callback filter-entries();
     in-out property <int> active-index: -1;
-    in-out property <string> selected-name: "Select an application";
+    in-out property <string> selected-name: "Select a container";
     in-out property <string> selected-summary: "Choose a stack on the left";
     in-out property <string> selected-warning: "";
     in-out property <string> status-message: "Ready";
@@ -70,8 +82,9 @@ export component ContainerSafeWindow inherits Window {
     in-out property <bool> loading: false;
     in-out property <int> page: 0;
 
-    callback select-app(int);
-    callback cycle-decision(int);
+    callback select-node(int, string);
+    callback toggle-node(string);
+    callback filter-changed();
     callback refresh-inventory();
     callback save-selection();
     callback validate-selection();
@@ -103,6 +116,8 @@ export component ContainerSafeWindow inherits Window {
     callback save-server();
     callback browse-key();
     callback trust-host();
+
+
     MenuBar {
         Menu { title: "File";
             MenuItem { title: "New Server..."; shortcut: @keys(Control + N); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("new"); } }
@@ -115,359 +130,173 @@ export component ContainerSafeWindow inherits Window {
             MenuItem { title: "About ContainerSafe"; activated => { root.dialog = 4; } }
         }
     }
-    FocusScope {
-        key-pressed(event) => {
-            if event.text == Key.Escape && root.dialog != 0 { root.server-action("cancel"); return accept; }
-            return reject;
-        }
-    FocusScope {
-    enabled: root.dialog == 0;
-    HorizontalLayout {
-        spacing: 0px;
-        Rectangle {
-            width: 205px;
-            background: #111e30;
-            VerticalLayout {
-                padding: 14px;
-                spacing: 8px;
-                Rectangle {
-                    height: 64px;
-                    HorizontalLayout {
-                        spacing: 12px;
-                        Rectangle {
-                            width: 42px;
-                            height: 42px;
-                            background: #2865a0;
-                            border-radius: 9px;
-                            SelectableText {
-                                text: "CS";
-                                text-color: white;
-                                font-size: 16px;
-                                font-weight: 800;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                        VerticalLayout {
-                            spacing: 1px;
-                            SelectableText { text: "ContainerSafe " + root.app-version; font-weight: 700; text-color: #f1f6ff; font-size: 15px; }
-                            SelectableText { text: root.active-server; overflow: elide; text-color: #8da1bc; font-size: 10px; }
-                        }
+
+    init => { Palette.color-scheme = light; }
+    FocusScope { key-pressed(event) => { if event.text == Key.Escape && root.dialog != 0 { root.server-action("cancel"); return accept; } return reject; }
+    FocusScope { enabled: root.dialog == 0;
+    HorizontalLayout { spacing: 0px;
+        Rectangle { width: 186px; background: #ffffff; border-width: 1px; border-color: #e1e8f0;
+            VerticalLayout { padding: 14px; spacing: 8px;
+                HorizontalLayout { height: 76px; spacing: 8px;
+                    Image { width: 34px; height: 34px; source: @image-url("../assets/icons/containersafe.png"); image-fit: contain; }
+                    VerticalLayout { spacing: 4px; alignment: center;
+                        SelectableText { text: "ContainerSafe"; text-color: Theme.ink; font-size: 14px; font-weight: 750; }
+                        SelectableText { text: "Version " + root.app-version; text-color: Theme.muted; font-size: 11px; }
                     }
                 }
-                Rectangle { height: 1px; background: #2a3b51; }
-                SelectableText { height: 28px; text: "WORKSPACE"; font-size: 10px; font-weight: 700; text-color: #6f88a8; vertical-alignment: center; }
-                NavLine { label: "Applications"; active: root.page == 0; pressed => { root.page = 0; } }
+                SelectableText { height: 32px; text: "WORKSPACE"; text-color: #8b9aac; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                NavLine { label: "Containers"; active: root.page == 0; pressed => { root.page = 0; } }
                 NavLine { label: "Backup plans"; active: root.page == 1; pressed => { root.page = 1; } }
                 NavLine { label: "Activity"; active: root.page == 2; pressed => { root.page = 2; } }
                 Rectangle { vertical-stretch: 1; }
-                Rectangle { height: 1px; background: #2a3b51; }
+                Rectangle { height: 1px; background: Theme.line; }
+                NavLine { label: "Servers"; pressed => { root.server-action("servers"); } }
                 NavLine { label: "About"; active: root.page == 3; pressed => { root.page = 3; } }
-                SelectableText {
-                    height: 32px;
-                    text: "DEVELOPMENT PREVIEW  |  READ ONLY";
-                    text-color: #7890aa;
-                    font-size: 9px;
-                    vertical-alignment: center;
-                }
+                SelectableText { height: 34px; text: "Discovery & planning"; font-size: 10px; text-color: #8b9aac; vertical-alignment: center; }
             }
         }
-
-        Rectangle {
-            background: #0d1522;
-            VerticalLayout {
-                spacing: 0px;
-
-                Rectangle {
-                    height: 64px;
-                    background: #142136;
-                    HorizontalLayout {
-                        padding-left: 22px;
-                        padding-right: 18px;
-                        spacing: 12px;
-                        SelectableText {
-                            text: root.page == 3 ? "About ContainerSafe" : root.page == 2 ? "Activity" : root.page == 1 ? "Backup plans" : "Applications";
-                            font-size: 20px;
-                            font-weight: 700;
-                            text-color: #f1f5fe;
-                            vertical-alignment: center;
-                            horizontal-stretch: 1;
-                        }
-                        Button {
-                            text: "Retry / Refresh";
-                            enabled: !root.loading && root.dialog == 0;
-                            clicked => { root.refresh-inventory(); }
-                        }
-                        Button {
-                            text: root.dirty ? "Save changes *" : "Save selections";
-                            enabled: !root.loading && root.dirty && root.dialog == 0;
-                            clicked => { root.save-selection(); }
-                        }
-                        Button {
-                            text: "Validate";
-                            enabled: !root.loading && root.dialog == 0;
-                            clicked => { root.validate-selection(); }
-                        }
+        VerticalLayout { spacing: 0px;
+            Rectangle { height: 86px; background: white;
+                HorizontalLayout { padding-left: 26px; padding-right: 26px; spacing: 10px;
+                    VerticalLayout { alignment: center; spacing: 5px; horizontal-stretch: 1;
+                        SelectableText { text: root.page == 3 ? "About ContainerSafe" : root.page == 2 ? "Activity" : root.page == 1 ? "Backup plans" : "Containers"; font-size: 25px; font-weight: 700; text-color: Theme.ink; }
+                        SelectableText { text: root.active-server; text-color: Theme.muted; font-size: 12px; overflow: elide; }
                     }
+                    VerticalLayout { alignment: center; Button { text: root.loading ? "Refreshing…" : "Refresh"; enabled: !root.loading; clicked => { root.refresh-inventory(); } } }
+                    VerticalLayout { alignment: center; Button { text: root.dirty ? "Save changes •" : "Save selections"; enabled: !root.loading && root.dirty; primary: true; clicked => { root.save-selection(); } } }
+                    VerticalLayout { alignment: center; Button { text: "Validate"; enabled: !root.loading && root.total-apps > 0; clicked => { root.validate-selection(); } } }
                 }
-
-                if root.page == 0 || root.page == 1 : Rectangle {
-                    background: #0d1522;
-                    vertical-stretch: 1;
-                    VerticalLayout {
-                        spacing: 0px;
-                        Rectangle {
-                            height: 76px;
-                            background: #0f1b2a;
-                            HorizontalLayout {
-                                padding-left: 24px;
-                                padding-right: 24px;
-                                spacing: 22px;
-                                VerticalLayout {
-                                    spacing: 0px;
-                                    SelectableText { text: "APPLICATIONS"; text-color: #8299b5; font-size: 10px; }
-                                    SelectableText { text: root.total-apps; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
-                                }
-                                Rectangle { width: 1px; background: #29394d; }
-                                VerticalLayout {
-                                    spacing: 0px;
-                                    SelectableText { text: "CONTAINERS"; text-color: #8299b5; font-size: 10px; }
-                                    SelectableText { text: root.total-containers; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
-                                }
-                                Rectangle { width: 1px; background: #29394d; }
-                                VerticalLayout {
-                                    spacing: 0px;
-                                    SelectableText { text: "DATA SOURCES"; text-color: #8299b5; font-size: 10px; }
-                                    SelectableText { text: root.total-sources; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
-                                }
-                                Rectangle { width: 1px; background: #29394d; }
-                                VerticalLayout {
-                                    spacing: 0px;
-                                    SelectableText { text: "DATABASES"; text-color: #8299b5; font-size: 10px; }
-                                    SelectableText { text: root.total-dbs; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
-                                }
+            }
+            if root.page == 0 : VerticalLayout {
+                padding: 22px; spacing: 18px;
+                HorizontalLayout { spacing: 12px;
+                    Metric { label: "Containers"; value: root.total-containers; }
+                    Metric { label: "Stacks & standalone"; value: root.total-apps; tint: #6083b5; }
+                    Metric { label: "Storage sources"; value: root.total-sources; tint: #6a9a86; }
+                    Metric { label: "Databases"; value: root.total-dbs; tint: #9880b4; }
+                }
+                HorizontalLayout { spacing: 18px; vertical-stretch: 1;
+                    Rectangle { width: 306px; background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line;
+                        VerticalLayout { padding: 12px; spacing: 10px;
+                            HorizontalLayout { height: 28px; padding-left: 6px;
+                                SelectableText { text: "Container explorer"; text-color: Theme.ink; font-weight: 650; font-size: 14px; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
-                                SelectableText {
-                                    text: "Backup execution disabled";
-                                    text-color: #e4b77c;
-                                    font-size: 12px;
-                                    vertical-alignment: center;
+                            }
+                            LineEdit { text <=> root.filter-text; placeholder-text: "Find a stack or container…"; edited => { root.filter-changed(); } }
+                            ListView {
+                                for item in root.tree-model: TreeLine {
+                                    entry: item;
+                                    selected => { if item.app-index >= 0 { root.select-node(item.app-index, item.container); } else { root.toggle-node(item.key); } }
+                                    toggled => { root.toggle-node(item.key); }
                                 }
                             }
+                            if root.tree-model.length == 0 : SelectableText { height: 54px; text: root.filter-text == "" ? "Connect a server to discover containers." : "No matching containers."; wrap: word-wrap; text-color: Theme.muted; font-size: 12px; }
                         }
-                        HorizontalLayout {
-                            spacing: 0px;
-                            Rectangle {
-                                width: 340px;
-                                background: #101c2d;
-                                VerticalLayout {
-                                    padding-top: 12px;
-                                    spacing: 0px;
-                                    Rectangle {
-                                        height: 42px;
-                                        SelectableText {
-                                            x: 18px;
-                                            text: "DOCKER APPLICATIONS";
-                                            text-color: #8aa2c0;
-                                            font-size: 11px;
-                                            font-weight: 700;
-                                            vertical-alignment: center;
+                    }
+                    Rectangle { background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line; horizontal-stretch: 1;
+                        VerticalLayout { padding: 20px; spacing: 14px;
+                            VerticalLayout { spacing: 6px;
+                                SelectableText { text: root.selected-name; text-color: Theme.ink; font-size: 22px; font-weight: 700; overflow: elide; }
+                                SelectableText { text: root.selected-summary; text-color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                            }
+                            Rectangle { height: 40px; background: #fff7e7; border-radius: 6px;
+                                HorizontalLayout { padding-left: 12px; padding-right: 12px;
+                                    SelectableText { text: root.selected-warning; text-color: #8b641e; font-size: 12px; overflow: elide; vertical-alignment: center; }
+                                }
+                            }
+                            HorizontalLayout { height: 36px; spacing: 6px;
+                                Button { text: "All sources"; primary: root.entry-kind == 0; clicked => { root.entry-kind = 0; root.filter-entries(); } }
+                                Button { text: "Storage"; primary: root.entry-kind == 1; clicked => { root.entry-kind = 1; root.filter-entries(); } }
+                                Button { text: "Databases"; primary: root.entry-kind == 2; clicked => { root.entry-kind = 2; root.filter-entries(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            HorizontalLayout { height: 22px; padding-left: 12px; padding-right: 8px;
+                                SelectableText { text: "SOURCE & RECOVERY METHOD"; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                SelectableText { text: "BACKUP SELECTION"; width: 154px; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                            }
+                            ListView {
+                                for entry in root.entries: Rectangle {
+                                    height: 82px;
+                                    background: #ffffff;
+                                    VerticalLayout { spacing: 0px;
+                                        HorizontalLayout { padding-top: 10px; padding-bottom: 10px; padding-right: 12px; spacing: 12px;
+                                            Rectangle { width: 44px; height: 26px; border-radius: 5px; background: entry.database ? #f0eafa : #e7f3ee;
+                                                Text { text: entry.database ? "DB" : "DATA"; color: entry.database ? #73539a : #39765c; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                            }
+                                            VerticalLayout { horizontal-stretch: 1; spacing: 5px;
+                                                SelectableText { text: entry.title; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
+                                                SelectableText { text: entry.location; text-color: Theme.muted; font-size: 12px; overflow: elide; }
+                                                SelectableText { text: entry.detail; text-color: entry.caution ? #976b20 : #7f8fa1; font-size: 11px; overflow: elide; }
+                                            }
+                                            ComboBox { width: 154px; model: entry.options; current-index: entry.choice; enabled: !root.loading; selected(value) => { root.choose-decision(entry.row-index, self.current-index); } }
                                         }
-                                    }
-                                    ListView {
-                                        for app[index] in root.applications: Rectangle {
-                                            height: 64px;
-                                            background: root.active-index == index ? #24405e : (Math.mod(index, 2) == 0 ? #132136 : #101c2d);
-                                            TouchArea {
-                                                clicked => { root.select-app(index); }
-                                            }
-                                            Rectangle {
-                                                x: 12px;
-                                                y: 8px;
-                                                width: 3px;
-                                                height: 48px;
-                                                background: root.active-index == index ? #65b5fa : transparent;
-                                                border-radius: 2px;
-                                            }
-                                            VerticalLayout {
-                                                padding-left: 25px;
-                                                padding-right: 12px;
-                                                padding-top: 10px;
-                                                padding-bottom: 9px;
-                                                spacing: 4px;
-                                                SelectableText {
-                                                    text: app.name;
-                                                    activated => { root.select-app(index); }
-                                                    font-weight: 650;
-                                                    font-size: 13px;
-                                                    text-color: #ecf3ff;
-                                                    overflow: elide;
-                                                }
-                                                SelectableText {
-                                                    text: app.note;
-                                                    activated => { root.select-app(index); }
-                                                    font-size: 11px;
-                                                    text-color: #8ca4c0;
-                                                    overflow: elide;
-                                                }
-                                            }
-                                        }
+                                        Rectangle { height: 1px; background: #e8edf3; }
                                     }
                                 }
                             }
-                            Rectangle {
-                                background: #0d1522;
-                                horizontal-stretch: 1;
-                                VerticalLayout {
-                                    spacing: 0px;
-                                    Rectangle {
-                                        height: 98px;
-                                        background: #142136;
-                                        VerticalLayout {
-                                            padding-left: 24px;
-                                            padding-right: 18px;
-                                            padding-top: 13px;
-                                            spacing: 6px;
-                                            SelectableText {
-                                                text: root.selected-name;
-                                                text-color: #f3f7ff;
-                                                font-size: 19px;
-                                                font-weight: 700;
-                                                overflow: elide;
-                                            }
-                                            SelectableText {
-                                                text: root.selected-summary;
-                                                text-color: #9eb4ce;
-                                                font-size: 12px;
-                                                overflow: elide;
-                                            }
-                                            SelectableText {
-                                                text: root.selected-warning;
-                                                text-color: #dcb37a;
-                                                font-size: 11px;
-                                                overflow: elide;
-                                            }
+                            if root.entries.length == 0 : SelectableText { height: 72px; text: root.active-index < 0 ? "Choose a container or stack to review its storage." : "No persistent storage or database detected for this selection."; text-color: Theme.muted; wrap: word-wrap; }
+                            SelectableText { height: 24px; text: "Selections prepare a backup plan. Production backup execution is not enabled."; text-color: #8996a6; font-size: 11px; overflow: elide; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
+            if root.page == 1 : VerticalLayout {
+                padding: 22px; spacing: 18px;
+                HorizontalLayout { spacing: 12px;
+                    Metric { label: "Selected operations"; value: root.selected-operations; tint: #39765c; }
+                    Metric { label: "Pending decisions"; value: root.pending-decisions; tint: #b58d46; }
+                    Metric { label: "Excluded items"; value: root.excluded-decisions; tint: #8996a6; }
+                    Metric { label: "Selection plans"; value: root.total-apps; tint: #6083b5; }
+                }
+                Rectangle { background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line; vertical-stretch: 1;
+                    VerticalLayout { padding: 22px; spacing: 14px;
+                        SelectableText { text: "Review your backup selections"; font-size: 20px; font-weight: 700; text-color: Theme.ink; }
+                        SelectableText { text: "See what is included, excluded or still pending. Review a plan, save your changes, then validate."; font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
+                        Rectangle { height: 40px; background: #f3f6fa; border-radius: 5px;
+                            HorizontalLayout { padding-left: 14px; padding-right: 14px; spacing: 16px;
+                                SelectableText { text: "STACK / CONTAINER"; text-color: #6b7f94; font-size: 10px; font-weight: 650; horizontal-stretch: 1; vertical-alignment: center; }
+                                SelectableText { text: "SELECTED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: "EXCLUDED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: "PENDING"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                Rectangle { width: 90px; }
+                            }
+                        }
+                        ListView {
+                            for plan in root.plan-model: Rectangle {
+                                height: 72px;
+                                VerticalLayout { spacing: 0px;
+                                    HorizontalLayout { padding-left: 14px; padding-right: 14px; spacing: 16px;
+                                        VerticalLayout { horizontal-stretch: 1; alignment: center; spacing: 5px;
+                                            SelectableText { text: plan.name; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
+                                            SelectableText { text: plan.kind + " · " + plan.containers + " containers"; text-color: Theme.muted; font-size: 11px; }
                                         }
+                                        SelectableText { text: plan.selected; width: 82px; text-color: #39765c; font-weight: 600; vertical-alignment: center; }
+                                        SelectableText { text: plan.excluded; width: 82px; text-color: Theme.muted; vertical-alignment: center; }
+                                        SelectableText { text: plan.pending; width: 82px; text-color: plan.pending > 0 ? #976b20 : #39765c; font-weight: 600; vertical-alignment: center; }
+                                        Button { width: 90px; text: "Review"; clicked => { root.filter-text = ""; root.page = 0; root.select-node(plan.app-index, ""); } }
                                     }
-                                    Rectangle {
-                                        height: 40px;
-                                        background: #17253a;
-                                        HorizontalLayout {
-                                            padding-left: 16px;
-                                            padding-right: 16px;
-                                            spacing: 8px;
-                                            SelectableText { text: "SOURCE / DATABASE"; horizontal-stretch: 1; text-color: #a6bdd9; font-size: 10px; font-weight: 700; vertical-alignment: center; }
-                                            SelectableText { text: "DECISION"; width: 134px; text-color: #a6bdd9; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
-                                        }
-                                    }
-                                    ListView {
-                                        for entry[index] in root.entries: Rectangle {
-                                            height: 73px;
-                                            background: Math.mod(index, 2) == 0 ? #111e30 : #0e1929;
-                                            HorizontalLayout {
-                                                padding-left: 15px;
-                                                padding-right: 16px;
-                                                spacing: 9px;
-                                                Rectangle {
-                                                    width: 52px;
-                                                    height: 22px;
-                                                    background: entry.database ? #3b2e4b : #203e4c;
-                                                    border-radius: 4px;
-                                                    SelectableText {
-                                                        text: entry.database ? "DB" : "DATA";
-                                                        text-color: entry.database ? #e5beff : #9cd9d4;
-                                                        font-size: 10px;
-                                                        font-weight: 750;
-                                                        horizontal-alignment: center;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                                VerticalLayout {
-                                                    horizontal-stretch: 1;
-                                                    spacing: 3px;
-                                                    SelectableText { text: entry.title; text-color: #f0f5fc; font-size: 12px; font-weight: 600; overflow: elide; }
-                                                    SelectableText { text: entry.location; text-color: #91a6bf; font-size: 10px; overflow: elide; }
-                                                    SelectableText { text: entry.detail; text-color: entry.caution ? #dfa66a : #718cac; font-size: 10px; overflow: elide; }
-                                                }
-                                                Button {
-                                                    width: 132px;
-                                                    text: entry.decision;
-                                                    enabled: !root.loading && root.dialog == 0;
-                                                    clicked => { root.cycle-decision(index); }
-                                                }
-                                            }
-                                            Rectangle { y: 72px; width: parent.width; height: 1px; background: #223249; }
-                                        }
-                                    }
-                                    Rectangle {
-                                        height: 52px;
-                                        background: #152338;
-                                        SelectableText {
-                                            x: 18px;
-                                            width: parent.width - 36px;
-                                            height: parent.height;
-                                            text: "Click a decision to cycle Pending / Include / Exclude (or Logical dump for PostgreSQL).";
-                                            text-color: #94acc8;
-                                            font-size: 11px;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                        }
-                                    }
+                                    Rectangle { height: 1px; background: #e8edf3; }
                                 }
                             }
                         }
+                        if root.plan-model.length == 0 : SelectableText { height: 70px; text: "No plans yet. Connect a server and discover its containers first."; text-color: Theme.muted; wrap: word-wrap; }
+                        SelectableText { text: "Planning only · No scheduled or production backups have been created."; text-color: #8996a6; font-size: 11px; }
                     }
                 }
-
-                if root.page == 2 : Rectangle {
-                    vertical-stretch: 1;
-                    background: #0d1522;
-                    VerticalLayout {
-                        padding: 38px;
-                        spacing: 14px;
-                        SelectableText { text: "Activity history"; text-color: #f5f7ff; font-size: 22px; font-weight: 700; }
-                        SelectableText { text: "No backup jobs have been executed. Job scheduling and Restic execution will be added after the core refactor."; text-color: #a2b5cd; wrap: word-wrap; }
-                    }
+            }
+            if root.page == 2 || root.page == 3 : Rectangle {
+                background: Theme.canvas; vertical-stretch: 1;
+                VerticalLayout { padding: 36px; spacing: 16px; alignment: start;
+                    SelectableText { text: root.page == 2 ? "No backup activity yet" : "ContainerSafe " + root.app-version; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
+                    SelectableText { text: root.page == 2 ? "Discover your containers, review storage and save your selections. Production scheduling is not enabled." : "Native Docker discovery and backup planning. Built with Rust + Slint."; wrap: word-wrap; text-color: Theme.muted; }
+                    if root.page == 3 : AboutSlint { height: 80px; }
                 }
-
-                if root.page == 3 : Rectangle {
-                    vertical-stretch: 1;
-                    background: #0d1522;
-                    VerticalLayout {
-                        padding: 38px;
-                        spacing: 18px;
-                        SelectableText { text: "ContainerSafe Native " + root.app-version; text-color: #f5f7ff; font-size: 22px; font-weight: 700; }
-                        SelectableText { text: "Rust + Slint. No web browser, HTML, JavaScript, React, or Tauri runtime."; text-color: #b2c4d9; font-size: 14px; }
-                        SelectableText { text: "Developer preview: discovery, planning, selection and validation only. Backup execution disabled."; text-color: #b2c4d9; wrap: word-wrap; }
-                        SelectableText { text: "Built with Slint"; font-size: 13px; text-color: #9cb7d5; }
-                        AboutSlint { width: 180px; height: 42px; }
-                        Rectangle { vertical-stretch: 1; }
-                    }
-                }
-
-                Rectangle {
-                    height: 36px;
-                    background: #101d2e;
-                    HorizontalLayout {
-                        padding-left: 18px;
-                        padding-right: 18px;
-                        spacing: 18px;
-                        SelectableText {
-                            text: root.status-message;
-                            text-color: #bed0e6;
-                            font-size: 11px;
-                            vertical-alignment: center;
-                            overflow: elide;
-                            horizontal-stretch: 1;
-                        }
-                        SelectableText {
-                            text: root.validation-message;
-                            text-color: #9db7d5;
-                            font-size: 11px;
-                            vertical-alignment: center;
-                            overflow: elide;
-                        }
-                    }
+            }
+            Rectangle { height: 38px; background: white;
+                HorizontalLayout { padding-left: 24px; padding-right: 24px; spacing: 14px;
+                    SelectableText { text: root.status-message; text-color: #556c82; font-size: 11px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
+                    SelectableText { text: root.validation-message; text-color: #7b8da2; font-size: 11px; overflow: elide; vertical-alignment: center; }
                 }
             }
         }
@@ -497,11 +326,11 @@ export component ContainerSafeWindow inherits Window {
         }
         if root.dialog == 3 || root.dialog == 5 : Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-            width: 690px; height: 320px; background: #16263b; border-radius: 8px;
+            width: 690px; height: 320px; background: #ffffff; border-radius: 8px;
             VerticalLayout {
                 padding: 24px; spacing: 14px;
-                SelectableText { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; text-color: #efba88; font-weight: 700; font-size: 18px; }
-                SelectableText { text: root.host-question; wrap: word-wrap; text-color: #d1e1f4; }
+                SelectableText { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; text-color: #8b641e; font-weight: 700; font-size: 18px; }
+                SelectableText { text: root.host-question; wrap: word-wrap; text-color: #3b536b; }
                 HorizontalLayout {
                     Button { text: "Cancel / Reject"; clicked => { root.server-action("cancel"); } }
                     Button { text: root.dialog == 5 ? "Remove profile and credential" : root.host-changed ? "Approve reviewed replacement" : "Trust this host";
@@ -512,11 +341,11 @@ export component ContainerSafeWindow inherits Window {
         }
         if root.dialog == 4 : Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-            width: 560px; height: 350px; background: #16263b;
+            width: 560px; height: 350px; background: #ffffff;
             VerticalLayout {
                 padding: 28px; spacing: 16px;
-                SelectableText { text-color: #f0f5ff; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
-                SelectableText { text-color: #b2c4d9; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
+                SelectableText { text-color: #192b42; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
+                SelectableText { text-color: #62748a; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
                 AboutSlint { height: 110px; }
                 Button { text: "Close"; clicked => { root.server-action("cancel"); } }
             }

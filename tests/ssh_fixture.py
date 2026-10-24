@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import sys
@@ -12,10 +13,21 @@ import paramiko
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 root = Path(sys.argv[1])
 paramiko.util.log_to_file(str(root / "ssh.log"))
-host_key = paramiko.RSAKey.generate(2048)
+host_kind = sys.argv[2] if len(sys.argv) > 2 else "rsa"
+if host_kind == "ed25519":
+    host_path = root / "host_ed25519"
+    host_path.write_bytes(Ed25519PrivateKey.generate().private_bytes(serialization.Encoding.PEM,
+        serialization.PrivateFormat.OpenSSH, serialization.NoEncryption()))
+    host_key = paramiko.Ed25519Key.from_private_key_file(str(host_path))
+elif host_kind == "ecdsa":
+    host_key = paramiko.ECDSAKey.generate()
+else:
+    host_key = paramiko.RSAKey.generate(2048)
 private = Ed25519PrivateKey.generate()
 key_path = root / "fixture_ed25519"
 key_path.write_bytes(private.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH,
@@ -25,15 +37,35 @@ key_files = {}
 rsa_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 ecdsa_private = ec.generate_private_key(ec.SECP256R1())
 for name, private_key, key_format, encrypted in [
+    ("ed25519_openssh_plain", private, serialization.PrivateFormat.OpenSSH, False),
     ("rsa_pem", rsa_private, serialization.PrivateFormat.TraditionalOpenSSL, False),
     ("rsa_pem_encrypted", rsa_private, serialization.PrivateFormat.TraditionalOpenSSL, True),
     ("rsa_openssh_encrypted", rsa_private, serialization.PrivateFormat.OpenSSH, True),
     ("rsa_pkcs8_encrypted", rsa_private, serialization.PrivateFormat.PKCS8, True),
     ("ecdsa_pem_encrypted", ecdsa_private, serialization.PrivateFormat.TraditionalOpenSSL, True),
+    ("ecdsa_openssh_encrypted", ecdsa_private, serialization.PrivateFormat.OpenSSH, True),
+    ("ecdsa_pkcs8_encrypted", ecdsa_private, serialization.PrivateFormat.PKCS8, True),
 ]:
     destination = root / name
     destination.write_bytes(private_key.private_bytes(serialization.Encoding.PEM, key_format,
         serialization.BestAvailableEncryption(b"fixture-passphrase") if encrypted else serialization.NoEncryption()))
+    key_files[name] = str(destination)
+
+# The cryptography serializer above uses AES-256 for legacy PEM. Exercise the
+# AES-128 compatibility branch independently with the same generated keypairs.
+for name, private_key, label in [("rsa_pem_aes128_encrypted", rsa_private, "RSA"),
+                                ("ecdsa_pem_aes128_encrypted", ecdsa_private, "EC")]:
+    iv = os.urandom(16)
+    aes_key = hashlib.md5(b"fixture-passphrase" + iv[:8]).digest()
+    der = private_key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.TraditionalOpenSSL,
+                                   serialization.NoEncryption())
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(der) + padder.finalize()
+    encryptor = Cipher(algorithms.AES(aes_key), modes.CBC(iv)).encryptor()
+    encoded = base64.b64encode(encryptor.update(padded) + encryptor.finalize()).decode()
+    body = "\n".join(encoded[i:i+64] for i in range(0, len(encoded), 64))
+    destination = root / name
+    destination.write_text(f"-----BEGIN {label} PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,{iv.hex().upper()}\n\n{body}\n-----END {label} PRIVATE KEY-----\n", encoding="ascii")
     key_files[name] = str(destination)
 client_keys = [client_key, paramiko.RSAKey.from_private_key_file(key_files["rsa_pem"]),
                paramiko.ECDSAKey.from_private_key_file(key_files["ecdsa_pem_encrypted"], "fixture-passphrase")]
@@ -44,9 +76,13 @@ class Server(paramiko.ServerInterface):
         return "password,publickey"
 
     def check_auth_password(self, username, password):
+        with (root / "auth-events.log").open("a") as event:
+            event.write("password\n")
         return paramiko.AUTH_SUCCESSFUL if username in ("fixture", "denied", "synology") and password == "fixture-password" else paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, key):
+        with (root / "auth-events.log").open("a") as event:
+            event.write("publickey\n")
         return paramiko.AUTH_SUCCESSFUL if username == "fixture" and key in client_keys else paramiko.AUTH_FAILED
 
     def check_channel_request(self, kind, chanid):
@@ -57,6 +93,22 @@ class Server(paramiko.ServerInterface):
             command_text = command.decode()
             username = channel.get_transport().get_username()
             synology_command = command_text.startswith("sudo -n /var/packages/ContainerManager/target/usr/bin/docker ")
+            if "fixture-hang" in command_text:
+                time.sleep(3)
+                channel.close()
+                return
+            if "fixture-no-status" in command_text:
+                channel.close()
+                return
+            if "fixture-large" in command_text:
+                try:
+                    for _ in range(33):
+                        channel.sendall(b"x" * 1024 * 1024)
+                    channel.send_exit_status(0)
+                    channel.close()
+                except (EOFError, OSError):
+                    pass
+                return
             if username == "denied":
                 channel.send_stderr(b"sudo: a password is required\nprivate-fixture-marker\n" if command_text.startswith("sudo ") else b"permission denied\nprivate-fixture-marker\n")
                 status = 1

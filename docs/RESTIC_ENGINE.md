@@ -1,5 +1,7 @@
 # ContainerSafe 0.12 — motorul Restic
 
+Această pagină descrie etapa 0.12. Etapa 0.13 adaugă [agentul Linux](LINUX_AGENT.md); comenzile de laborator afișează versiunea curentă a aplicației.
+
 În discuția inițială, etapa **v0.8** cerea extragerea comenzilor din `restic_lab.rs` într-un motor Rust reutilizabil, independent de interfață: configurare repository, secrete separate, rezultate și erori tipizate, backup, listare, verificare și restaurare. Aplicația a ajuns între timp la 0.11 prin dezvoltarea interfeței și SSH; această implementare continuă numerotarea cu **0.12**, fără revenire la o versiune mai mică.
 
 ## Ce funcționează
@@ -25,7 +27,7 @@ cargo run --locked -- lab-backup --restic C:\Users\radut\bin\restic.exe
 
 Rezultatul așteptat:
 
-1. Apare `ContainerSafe 0.12` și un director temporar `containersafe-lab-*`.
+1. Apare versiunea curentă ContainerSafe și un director temporar `containersafe-lab-*`.
 2. Se inițializează un repository criptat și se salvează prima versiune a fișierului fictiv.
 3. Se verifică integral repository-ul și se restaurează prima versiune.
 4. Se modifică fișierul și se creează al doilea snapshot.
@@ -44,7 +46,7 @@ cargo test --locked --manifest-path native/Cargo.toml
 cargo run --locked --manifest-path native/Cargo.toml
 ```
 
-Ultima comandă pornește interfața existentă; verifică versiunea **0.12** în titlu/bară/About. Motorul nou este testabil din CLI; nu există încă un buton de backup de producție conectat la el.
+Ultima comandă pornește interfața existentă; verifică versiunea curentă în titlu/bară/About. Motorul este testabil din CLI; nu există încă un buton de backup de producție conectat la el.
 
 ## Pașii următori ai planului inițial
 

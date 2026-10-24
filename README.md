@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.12** · Next releases increment by **0.01** (0.13, 0.14, …).
+**Version 0.15** · Next releases increment by **0.01** (0.16, 0.17, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -90,7 +90,7 @@ Installer builds run only when a version tag (`v*`) is pushed. Ordinary commits 
 ### Prerequisites
 
 - **Rust and Cargo** (a toolchain compatible with Slint 1.18).
-- **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK. SSH uses native WinCNG; OpenSSL and Perl are not required. Private-key login requires an RSA key in traditional PEM format (encrypted keys are supported); Ed25519, ECDSA, PKCS#8 and modern OpenSSH key containers are unsupported by the locked WinCNG backend. See [SSH compatibility](docs/SERVER_MANAGEMENT.md#credentials-and-keys).
+- **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK. SSH uses `russh` with `ring`, without OpenSSL or Perl. Ed25519, ECDSA and RSA keys in compatible OpenSSH/PEM/PKCS#8 formats are supported, including encrypted keys. PuTTY keys use the documented encrypted export workflow. See [SSH compatibility](docs/SERVER_MANAGEMENT.md#credentials-and-keys).
 - **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. Configure a server in the native app first. Connections pin the host key before authentication; Docker access is discovered using a restricted command list.
 - **For the local Restic engine/lab:** a Restic executable (validated with 0.19.1), configured explicitly or available on `PATH`.
 
@@ -126,6 +126,8 @@ In VS Code, use **Terminal → Run Task → Run ContainerSafe desktop**. **Ctrl+
 
 After the splash, first launch opens **New Docker Server**. Configure and test SSH, review the host fingerprint, then save. Later launches connect to the default server asynchronously. **File → Servers...** manages profiles and switches servers; the selected server and version are visible in the application bar. Offline servers leave the app open.
 
+The light workspace separates **Containers** (searchable Compose/project/container and standalone tree, with storage/database review) from **Backup plans** (selected/excluded/pending totals per plan). Choose decisions explicitly from dropdowns; protected raw database paths cannot be included. See [v0.15 interface and Romanian test instructions](docs/UI_REDESIGN.md).
+
 Profiles live in `%APPDATA%\ContainerSafe\servers.json` on Windows, with per-server backup data under `servers/<uuid>/`. Passwords/passphrases use the OS credential store, or remain session-only when Remember is unchecked. Existing repository JSON files are never imported automatically. See [server setup, PPK integration, migration and validation](docs/SERVER_MANAGEMENT.md).
 
 ### 4. Run the isolated backup/restore lab (optional)
@@ -140,6 +142,8 @@ cargo run --locked -- lab-backup --restic C:\Users\radut\bin\restic.exe
 **Lab only:** this command uses the shared, typed Restic engine on disposable local files. It creates two snapshots, checks all repository data and verifies three isolated restores by comparing bytes. It uses a random session-only password, which is never saved or printed. The retained fixture directories are inspectable, but their disposable encrypted repository cannot be reopened after the lab exits. No server connection or production Docker data is used. `CONTAINERSAFE_RESTIC` can also select the executable. See [the v0.12 engine scope and Romanian test instructions](docs/RESTIC_ENGINE.md).
 
 ## Example workflow
+
+The Linux `containersafe-agent` binary now exposes versioned JSON requests over stdin/stdout for configured local jobs. It reuses the Restic engine and requires explicit operation permissions and private password files. See [agent setup and disposable Linux testing](docs/LINUX_AGENT.md). Desktop-to-agent orchestration and consistent database backups are subsequent milestones.
 
 ```text
 1. Discover Docker services
@@ -161,11 +165,12 @@ cargo run --locked -- lab-backup --restic C:\Users\radut\bin\restic.exe
 - [x] Selection validation with risky-source checks
 - [x] Local Restic backup, integrity check, incremental snapshot, and restore test
 - [x] Reusable typed local Restic engine with secret references and guarded isolated restores
+- [x] Linux stdio agent with configured jobs, explicit operation permissions and file-permission checks
 - [x] Native Slint desktop prototype
 - [x] Shared Rust core for CLI and desktop, explicit server UUIDs and isolated local data
 - [x] Server manager, pinned SSH identities, OS credentials and default-server startup
 - [ ] Robust cross-platform CLI, configuration and error handling
-- [ ] Agent-based Docker host access with least-privilege considerations
+- [ ] Desktop-to-agent transport and Docker/database orchestration with least-privilege considerations
 - [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies
 - [ ] PostgreSQL-consistent backup adapter and disposable integration tests
 - [ ] Restic destination management, scheduling and retention

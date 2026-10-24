@@ -5,8 +5,9 @@
 )]
 use containersafe::servers::{credentials::Secret, model::Server, storage};
 use serde::{Deserialize, Serialize};
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 mod server_ui;
@@ -78,6 +79,8 @@ struct State {
     report: BackupReport,
     selection: BackupSelection,
     active: usize,
+    selected_container: Option<String>,
+    expanded: BTreeSet<String>,
     dirty: bool,
     busy: bool,
     server: Option<Server>,
@@ -211,6 +214,8 @@ fn load_state<F: FnMut(i32, &'static str)>(root: &Path, mut progress: F) -> (Sta
             report,
             selection,
             active: 0,
+            selected_container: None,
+            expanded: BTreeSet::from(["compose".into(), "standalone".into()]),
             dirty: false,
             busy: false,
             server: None,
@@ -308,27 +313,161 @@ fn pending_count(state: &State) -> usize {
         .sum()
 }
 
+fn decision_values(database: bool, policy: &str) -> Vec<&'static str> {
+    let mut values = vec!["pending"];
+    loop {
+        let current = values.last().copied().unwrap_or("pending");
+        let next = if database {
+            next_database_decision(current, policy)
+        } else {
+            next_source_decision(current, policy)
+        };
+        if values.contains(&next) {
+            break;
+        }
+        values.push(next);
+    }
+    values
+}
+fn decision_options(database: bool, policy: &str) -> ModelRc<slint::SharedString> {
+    ModelRc::new(VecModel::from(
+        decision_values(database, policy)
+            .iter()
+            .map(|value| display_decision(value).into())
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn container_tree(
+    report: &BackupReport,
+    expanded: &BTreeSet<String>,
+    filter: &str,
+    active: usize,
+    selected: Option<&str>,
+) -> Vec<TreeEntry> {
+    let filter = filter.trim().to_lowercase();
+    let mut rows = Vec::new();
+    for (group, compose) in [("compose", true), ("standalone", false)] {
+        let mut projects: Vec<_> = report
+            .applications
+            .iter()
+            .enumerate()
+            .filter(|(_, app)| {
+                app.application.starts_with("compose/") == compose
+                    && (filter.is_empty()
+                        || app.application.to_lowercase().contains(&filter)
+                        || app
+                            .containers
+                            .iter()
+                            .any(|name| name.to_lowercase().contains(&filter)))
+            })
+            .collect();
+        projects.sort_by_key(|(_, app)| app.application.to_lowercase());
+        if projects.is_empty() {
+            continue;
+        }
+        let is_open = !filter.is_empty() || expanded.contains(group);
+        rows.push(TreeEntry {
+            key: group.into(),
+            name: if compose { "Compose" } else { "Standalone" }.into(),
+            note: projects
+                .iter()
+                .map(|(_, app)| app.containers.len())
+                .sum::<usize>()
+                .to_string()
+                .into(),
+            depth: 0,
+            branch: true,
+            expanded: is_open,
+            selected: false,
+            app_index: -1,
+            container: "".into(),
+        });
+        if !is_open {
+            continue;
+        }
+        for (index, app) in projects {
+            let key = format!("project:{}", app.application);
+            let is_open = !filter.is_empty() || expanded.contains(&key);
+            if compose {
+                rows.push(TreeEntry {
+                    key: key.into(),
+                    name: app
+                        .application
+                        .strip_prefix("compose/")
+                        .unwrap_or(&app.application)
+                        .into(),
+                    note: app.containers.len().to_string().into(),
+                    depth: 1,
+                    branch: true,
+                    expanded: is_open,
+                    selected: active == index && selected.is_none(),
+                    app_index: index as i32,
+                    container: "".into(),
+                });
+                if !is_open {
+                    continue;
+                }
+            }
+            let project_match = app.application.to_lowercase().contains(&filter);
+            let mut containers: Vec<_> = app
+                .containers
+                .iter()
+                .filter(|name| {
+                    filter.is_empty() || project_match || name.to_lowercase().contains(&filter)
+                })
+                .collect();
+            containers.sort_by_key(|name| name.to_lowercase());
+            for name in containers {
+                rows.push(TreeEntry {
+                    key: format!("container:{}:{name}", app.application).into(),
+                    name: name.trim_start_matches('/').into(),
+                    note: "".into(),
+                    depth: if compose { 2 } else { 1 },
+                    branch: false,
+                    expanded: false,
+                    selected: active == index
+                        && (selected == Some(name.as_str()) || (!compose && selected.is_none())),
+                    app_index: index as i32,
+                    container: name.as_str().into(),
+                });
+            }
+        }
+    }
+    rows
+}
+
 fn render(ui: &ContainerSafeWindow, state: &State) {
-    let apps: Vec<AppEntry> = state
-        .report
-        .applications
-        .iter()
-        .map(|app| AppEntry {
-            name: app.application.clone().into(),
-            note: format!(
-                "{} containers  ·  {} sources  ·  {} DB",
-                app.containers.len(),
-                app.sources.len(),
-                app.databases.len()
-            )
-            .into(),
-            containers: app.containers.len() as i32,
-            sources: app.sources.len() as i32,
-            dbs: app.databases.len() as i32,
-            needs_review: app.status == "needs_review",
+    let plans = plan_overview(&state.report, &state.selection);
+    ui.set_selected_operations(plans.iter().map(|plan| plan.selected).sum());
+    ui.set_pending_decisions(plans.iter().map(|plan| plan.pending).sum());
+    ui.set_excluded_decisions(plans.iter().map(|plan| plan.excluded).sum());
+    ui.set_plan_model(ModelRc::new(VecModel::from(plans)));
+    let tree = container_tree(
+        &state.report,
+        &state.expanded,
+        ui.get_filter_text().as_str(),
+        state.active,
+        state.selected_container.as_deref(),
+    );
+    let current_tree = ui.get_tree_model();
+    if current_tree.row_count() == tree.len()
+        && tree.iter().enumerate().all(|(i, row)| {
+            current_tree
+                .row_data(i)
+                .is_some_and(|current| current.key == row.key)
         })
-        .collect();
-    ui.set_applications(ModelRc::new(VecModel::from(apps)));
+    {
+        if let Some(model) = current_tree.as_any().downcast_ref::<VecModel<TreeEntry>>() {
+            for (i, row) in tree.into_iter().enumerate() {
+                model.set_row_data(i, row);
+            }
+        } else {
+            ui.set_tree_model(ModelRc::new(VecModel::from(tree)));
+        }
+    } else {
+        ui.set_tree_model(ModelRc::new(VecModel::from(tree)));
+    }
     ui.set_total_apps(state.report.applications.len() as i32);
     ui.set_total_containers(
         state
@@ -364,7 +503,7 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             if state.server.is_none() {
                 "No server connected"
             } else {
-                "No Docker applications detected"
+                "No containers detected"
             }
             .into(),
         );
@@ -380,10 +519,24 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
         return;
     };
     ui.set_active_index(state.active as i32);
-    ui.set_selected_name(app.application.as_str().into());
+    let project = app
+        .application
+        .split_once('/')
+        .map(|(_, name)| name)
+        .unwrap_or(&app.application);
+    let container = state
+        .selected_container
+        .as_deref()
+        .filter(|name| app.containers.iter().any(|c| c == name));
+    ui.set_selected_name(container.unwrap_or(project).trim_start_matches('/').into());
     ui.set_selected_summary(
         format!(
-            "{} containers · {} storage sources · {} databases",
+            "{} · {} containers · {} storage sources · {} databases",
+            if app.application.starts_with("compose/") {
+                format!("Compose / {project} · project-wide storage")
+            } else {
+                "Standalone container".into()
+            },
             app.containers.len(),
             app.sources.len(),
             app.databases.len()
@@ -392,14 +545,14 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
     );
     ui.set_selected_warning(
         format!(
-            "Needs review · {} recovery warnings · no backup has been created",
+            "{} items need recovery review · no backup created",
             app.warnings.len()
         )
         .into(),
     );
     let choice = state.selection.applications.get(state.active);
     let mut entries: Vec<DataEntry> = Vec::new();
-    for source in &app.sources {
+    for (source_index, source) in app.sources.iter().enumerate() {
         let decision = choice
             .and_then(|c| c.sources.iter().find(|s| s.path == source.path))
             .map(|s| s.decision.as_str())
@@ -415,29 +568,108 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             _ => "Candidate persistent source · review before backup",
         };
         entries.push(DataEntry {
+            row_index: source_index as i32,
             title: source_label(&source.path).into(),
             location: source.path.as_str().into(),
             detail: format!("{}  ·  {}", detail, source.destination).into(),
             decision: display_decision(decision).into(),
+            options: decision_options(false, &source.policy),
+            choice: decision_values(false, &source.policy)
+                .iter()
+                .position(|value| *value == decision)
+                .unwrap_or(0) as i32,
             database: false,
             caution: protected,
         });
     }
-    for db in &app.databases {
+    for (database_index, db) in app.databases.iter().enumerate() {
         let decision = choice
             .and_then(|c| c.databases.iter().find(|d| d.container == db.container))
             .map(|d| d.decision.as_str())
             .unwrap_or("pending");
         entries.push(DataEntry {
+            row_index: (app.sources.len() + database_index) as i32,
             title: db.container.as_str().into(),
             location: db.engine.as_str().into(),
             detail: format!("Adapter: {} · not executable yet", db.required_method).into(),
             decision: display_decision(decision).into(),
+            options: decision_options(true, &db.engine),
+            choice: decision_values(true, &db.engine)
+                .iter()
+                .position(|value| *value == decision)
+                .unwrap_or(0) as i32,
             database: true,
             caution: db.engine != "PostgreSQL",
         });
     }
+    let kind = ui.get_entry_kind();
+    entries.retain(|entry| kind == 0 || (kind == 2) == entry.database);
     ui.set_entries(ModelRc::new(VecModel::from(entries)));
+}
+
+fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<PlanEntry> {
+    report
+        .applications
+        .iter()
+        .enumerate()
+        .map(|(index, app)| {
+            let selected = selection
+                .applications
+                .iter()
+                .find(|selected| selected.application == app.application);
+            let decisions: Vec<&str> = app
+                .sources
+                .iter()
+                .map(|source| {
+                    selected
+                        .and_then(|selected| {
+                            selected.sources.iter().find(|s| s.path == source.path)
+                        })
+                        .map(|s| s.decision.as_str())
+                        .unwrap_or("pending")
+                })
+                .chain(app.databases.iter().map(|db| {
+                    selected
+                        .and_then(|selected| {
+                            selected
+                                .databases
+                                .iter()
+                                .find(|d| d.container == db.container)
+                        })
+                        .map(|d| d.decision.as_str())
+                        .unwrap_or("pending")
+                }))
+                .collect();
+            PlanEntry {
+                name: app
+                    .application
+                    .split_once('/')
+                    .map(|(_, name)| name)
+                    .unwrap_or(&app.application)
+                    .into(),
+                kind: if app.application.starts_with("compose/") {
+                    "Compose"
+                } else {
+                    "Standalone"
+                }
+                .into(),
+                containers: app.containers.len() as i32,
+                selected: decisions
+                    .iter()
+                    .filter(|value| matches!(**value, "include" | "logical_dump"))
+                    .count() as i32,
+                excluded: decisions
+                    .iter()
+                    .filter(|value| **value == "exclude")
+                    .count() as i32,
+                pending: decisions
+                    .iter()
+                    .filter(|value| **value == "pending")
+                    .count() as i32,
+                app_index: index as i32,
+            }
+        })
+        .collect()
 }
 
 fn validate_saved(root: &Path) -> Result<(bool, String), String> {
@@ -460,6 +692,7 @@ fn create_main_window(
     root: PathBuf,
     initial: State,
     first_status: String,
+    preview: bool,
 ) -> Result<ContainerSafeWindow, Box<dyn std::error::Error>> {
     let state: SharedState = Arc::new(Mutex::new(initial));
     let ui = ContainerSafeWindow::new()?;
@@ -475,7 +708,7 @@ fn create_main_window(
     {
         let weak = ui.as_weak();
         let state = Arc::clone(&state);
-        ui.on_select_app(move |index| {
+        ui.on_select_node(move |index, container| {
             let Some(ui) = weak.upgrade() else {
                 return;
             };
@@ -488,7 +721,21 @@ fn create_main_window(
             if index < 0 || index as usize >= guard.report.applications.len() {
                 return;
             }
+            if !container.is_empty()
+                && !guard.report.applications[index as usize]
+                    .containers
+                    .iter()
+                    .any(|name| name == container.as_str())
+            {
+                return;
+            }
             guard.active = index as usize;
+            guard.selected_container = (!container.is_empty()).then(|| container.to_string());
+            let app = &guard.report.applications[index as usize];
+            if app.application.starts_with("compose/") {
+                let key = format!("project:{}", app.application);
+                guard.expanded.insert(key);
+            }
             render(&ui, &guard);
         });
     }
@@ -496,7 +743,7 @@ fn create_main_window(
     {
         let weak = ui.as_weak();
         let state = Arc::clone(&state);
-        ui.on_cycle_decision(move |index| {
+        ui.on_choose_decision(move |index, selected| {
             let Some(ui) = weak.upgrade() else {
                 return;
             };
@@ -513,7 +760,7 @@ fn create_main_window(
             let Some(choices) = guard.selection.applications.get_mut(active) else {
                 return;
             };
-            if index < 0 {
+            if index < 0 || selected < 0 {
                 return;
             }
             let i = index as usize;
@@ -521,7 +768,11 @@ fn create_main_window(
                 if let (Some(source), Some(choice)) =
                     (plan_app.sources.get(i), choices.sources.get_mut(i))
                 {
-                    choice.decision = next_source_decision(&choice.decision, &source.policy).into();
+                    let values = decision_values(false, &source.policy);
+                    let Some(value) = values.get(selected as usize) else {
+                        return;
+                    };
+                    choice.decision = (*value).into();
                 }
             } else {
                 let db_index = i - plan_app.sources.len();
@@ -529,7 +780,11 @@ fn create_main_window(
                     plan_app.databases.get(db_index),
                     choices.databases.get_mut(db_index),
                 ) {
-                    choice.decision = next_database_decision(&choice.decision, &db.engine).into();
+                    let values = decision_values(true, &db.engine);
+                    let Some(value) = values.get(selected as usize) else {
+                        return;
+                    };
+                    choice.decision = (*value).into();
                 }
             }
             guard.dirty = true;
@@ -648,7 +903,46 @@ fn create_main_window(
         });
     }
 
-    server_ui::install(&ui, state, root);
+    {
+        let weak = ui.as_weak();
+        let state = state.clone();
+        ui.on_toggle_node(move |key| {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            let Ok(mut state) = state.lock() else {
+                return;
+            };
+            if ui.get_dialog() != 0 {
+                return;
+            }
+            if !state.expanded.remove(key.as_str()) {
+                state.expanded.insert(key.to_string());
+            }
+            render(&ui, &state);
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let state = state.clone();
+        ui.on_filter_changed(move || {
+            if let (Some(ui), Ok(state)) = (weak.upgrade(), state.lock()) {
+                render(&ui, &state);
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let state = state.clone();
+        ui.on_filter_entries(move || {
+            if let (Some(ui), Ok(state)) = (weak.upgrade(), state.lock()) {
+                render(&ui, &state);
+            }
+        });
+    }
+    if !preview {
+        server_ui::install(&ui, state, root);
+    }
     Ok(ui)
 }
 
@@ -659,6 +953,48 @@ enum StartupEvent {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let arguments: Vec<_> = std::env::args().skip(1).collect();
+    // Explicit development-only visual fixture. Never read profiles or connect
+    // to a server in preview mode; its configuration lives in a disposable dir.
+    #[cfg(debug_assertions)]
+    if arguments
+        .first()
+        .is_some_and(|arg| arg == "--preview-report")
+    {
+        if arguments.len() != 2 {
+            return Err(
+                "Usage: containersafe-native --preview-report FILE (debug builds only)".into(),
+            );
+        }
+        let path = &arguments[1];
+        let report: BackupReport = read_json(Path::new(path))?;
+        let directory = tempfile::tempdir()?;
+        let selection = draft(&report);
+        let state = State {
+            report,
+            selection,
+            active: 0,
+            selected_container: None,
+            expanded: BTreeSet::from(["compose".into(), "standalone".into()]),
+            dirty: false,
+            busy: false,
+            server: None,
+            secret: Secret::default(),
+        };
+        let ui = create_main_window(
+            directory.path().to_owned(),
+            state,
+            "Visual preview · synthetic fixture data".into(),
+            true,
+        )?;
+        ui.set_active_server("Local preview · no server connection".into());
+        return ui.run().map_err(Into::into);
+    }
+    if !arguments.is_empty() {
+        return Err(
+            "Unknown arguments; --preview-report FILE is available only in debug builds".into(),
+        );
+    }
     let root = storage::config_root().map_err(std::io::Error::other)?;
     let splash = SplashWindow::new()?;
     splash.set_loading_progress(5);
@@ -716,7 +1052,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let Some(splash) = splash_weak.upgrade() else {
                 return;
             };
-            match create_main_window(root.clone(), state, message) {
+            match create_main_window(root.clone(), state, message, false) {
                 Ok(ui) => match ui.show() {
                     Ok(()) => {
                         *keep_main.borrow_mut() = Some(ui);
@@ -746,6 +1082,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tree_preserves_original_indices_and_search_exposes_only_matching_members() {
+        let report: BackupReport =
+            serde_json::from_str(include_str!("../tests/fixtures/ui-report.json")).unwrap();
+        let mut expanded = BTreeSet::from(["compose".into(), "standalone".into()]);
+        let closed = container_tree(&report, &expanded, "", 0, None);
+        assert_eq!(closed.iter().filter(|row| row.depth == 0).count(), 2);
+        assert!(!closed.iter().any(|row| row.name == "immich_postgres"));
+        expanded.insert("project:compose/immich".into());
+        let opened = container_tree(&report, &expanded, "", 0, Some("immich_postgres"));
+        let leaf = opened
+            .iter()
+            .find(|row| row.name == "immich_postgres")
+            .unwrap();
+        assert!(leaf.selected);
+        assert_eq!(leaf.app_index, 0);
+        assert_eq!(leaf.depth, 2);
+        let standalone = opened.iter().find(|row| row.name == "vaultwarden").unwrap();
+        assert_eq!(standalone.app_index, 10);
+        assert_eq!(standalone.depth, 1);
+        let filtered = container_tree(&report, &BTreeSet::new(), "immich_postgres", 0, None);
+        assert_eq!(filtered.iter().filter(|row| !row.branch).count(), 1);
+        assert_eq!(filtered.last().unwrap().container, "immich_postgres");
+        assert!(container_tree(&report, &expanded, "nonexistent-name", 0, None).is_empty());
+    }
+
+    #[test]
+    fn plan_overview_counts_decisions_by_identity_and_respects_protected_choices() {
+        let report: BackupReport =
+            serde_json::from_str(include_str!("../tests/fixtures/ui-report.json")).unwrap();
+        let mut selection = draft(&report);
+        selection.applications[0].sources[0].decision = "include".into();
+        selection.applications[0].databases[0].decision = "logical_dump".into();
+        selection.applications[0].databases[1].decision = "exclude".into();
+        selection.applications.reverse();
+        let plans = plan_overview(&report, &selection);
+        assert_eq!(plans[0].selected, 2);
+        assert_eq!(plans[0].excluded, 1);
+        assert_eq!(plans[0].pending, 1);
+        assert_eq!(
+            decision_values(false, "requires_logical_dump"),
+            ["pending", "exclude"]
+        );
+        assert_eq!(
+            decision_values(true, "PostgreSQL"),
+            ["pending", "logical_dump", "exclude"]
+        );
+        assert_eq!(
+            decision_values(true, "Redis/Valkey"),
+            ["pending", "exclude"]
+        );
+    }
 
     #[test]
     fn raw_postgres_volume_may_not_be_included() {

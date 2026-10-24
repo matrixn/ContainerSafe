@@ -2,11 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
-pub const SSH_KEY_COMPATIBILITY: &str = if cfg!(windows) {
-    "Windows WinCNG supports RSA private keys in traditional PEM format (BEGIN RSA PRIVATE KEY), including encrypted keys. Ed25519, ECDSA, PKCS#8 and modern BEGIN OPENSSH PRIVATE KEY files are unsupported by this build. Existing keys are never converted automatically."
-} else {
-    "Linux/macOS use libssh2 with OpenSSL: encrypted OpenSSH Ed25519 and compatible RSA/ECDSA keys are supported. Existing keys are never converted automatically."
-};
+pub const SSH_KEY_COMPATIBILITY: &str = "SSH uses russh with ring, without OpenSSL. Ed25519, ECDSA and RSA OpenSSH/PEM/PKCS#8 keys are supported, including compatible encrypted keys. Legacy PEM encryption supports AES-128-CBC and AES-256-CBC; other ciphers are reported explicitly. PPK requires manual encrypted OpenSSH export. Key files are never converted or changed. Host certificates and hardware security-key workflows are not supported by this interface.";
 
 pub fn now() -> u64 {
     std::time::SystemTime::now()
@@ -109,11 +105,7 @@ impl Server {
                 .read_to_string(&mut header)
                 .map_err(|_| "Invalid private-key format")?;
             if self.authentication == Authentication::Putty {
-                return Err(format!("PPK integration: open the key in PuTTYgen, export an encrypted OpenSSH private key, then select OpenSSH here. ContainerSafe never converts or decrypts key files automatically. {SSH_KEY_COMPATIBILITY}"));
-            }
-            #[cfg(windows)]
-            if !header.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
-                return Err(SSH_KEY_COMPATIBILITY.into());
+                return Err(format!("PPK integration: export an encrypted OpenSSH key manually with PuTTYgen, then choose OpenSSH here. Direct PPK import is not enabled in this build; no key files are changed. {SSH_KEY_COMPATIBILITY}"));
             }
             if !header.starts_with("-----BEGIN OPENSSH PRIVATE KEY-----")
                 && !header.starts_with("-----BEGIN RSA PRIVATE KEY-----")

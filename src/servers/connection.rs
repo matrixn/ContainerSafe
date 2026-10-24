@@ -2,12 +2,14 @@ use super::{
     credentials::Secret,
     model::{Authentication, DockerAccess, Server},
 };
-use base64::Engine;
-use sha2::{Digest, Sha256};
+use russh::{
+    client,
+    keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyOrCertificate},
+    ChannelMsg,
+};
 use std::{
-    io::Read,
-    net::{TcpStream, ToSocketAddrs},
-    time::{Duration, Instant},
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,8 +32,46 @@ impl From<String> for Failure {
 
 pub struct Connection {
     server: Server,
-    session: ssh2::Session,
+    session: client::Handle<PinnedHost>,
+    runtime: tokio::runtime::Runtime,
     docker_prefix: &'static str,
+}
+
+struct PinnedHost {
+    endpoint: String,
+    fingerprint: Option<String>,
+    rejection: Arc<Mutex<Option<Failure>>>,
+}
+impl client::Handler for PinnedHost {
+    type Error = russh::Error;
+    async fn check_server_key(
+        &mut self,
+        key: &PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
+        // Pin the same SSH wire-format SHA256 fingerprint used by the old backend.
+        // Certificates require a separate CA policy; never implicitly trust their key.
+        if key.certificate().is_some() {
+            if let Ok(mut rejection) = self.rejection.lock() {
+                *rejection = Some(Failure::Message("SSH: host certificates require a separate CA trust policy and are not supported by this interface".into()));
+            }
+            return Ok(false);
+        }
+        let key = key.public_key();
+        let identity = HostIdentity {
+            endpoint: self.endpoint.clone(),
+            key_type: key.algorithm().to_string(),
+            fingerprint: key.fingerprint(HashAlg::Sha256).to_string(),
+        };
+        match verify_host(&identity, self.fingerprint.as_deref()) {
+            Ok(()) => Ok(true),
+            Err(failure) => {
+                if let Ok(mut rejection) = self.rejection.lock() {
+                    *rejection = Some(failure);
+                }
+                Ok(false)
+            }
+        }
+    }
 }
 const DIRECT: [&str; 5] = [
     "docker",
@@ -101,63 +141,83 @@ impl Connection {
     ) -> Result<Self, Failure> {
         server.validate()?;
         let timeout = Duration::from_secs(server.timeout_seconds as u64);
-        // DNS resolution uses the OS resolver. The worker remains cancellable by revision.
-        let address = (server.host.as_str(), server.port)
-            .to_socket_addrs()
-            .map_err(|_| "SSH: hostname resolution failed".to_string())?
-            .next()
-            .ok_or("SSH: no address found".to_string())?;
-        let stream = TcpStream::connect_timeout(&address, timeout)
-            .map_err(|e| format!("SSH: connection failed or timed out ({})", e.kind()))?;
-        stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|_| "SSH: cannot set timeout".to_string())?;
-        stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|_| "SSH: cannot set timeout".to_string())?;
-        let mut session =
-            ssh2::Session::new().map_err(|_| "SSH: initialization failed".to_string())?;
-        session.set_timeout(server.timeout_seconds * 1000);
-        session.set_tcp_stream(stream);
-        session
-            .handshake()
-            .map_err(|e| format!("SSH: handshake failed or timed out ({e})"))?;
-        let (key, kind) = session
-            .host_key()
-            .ok_or("SSH: missing host identity".to_string())?;
-        let identity = HostIdentity {
-            endpoint: format!("[{}]:{}", server.host.to_ascii_lowercase(), server.port),
-            key_type: format!("{kind:?}"),
-            fingerprint: format!(
-                "SHA256:{}",
-                base64::engine::general_purpose::STANDARD_NO_PAD.encode(Sha256::digest(key))
-            ),
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .map_err(|_| "SSH: runtime initialization failed".to_string())?;
+        let endpoint = format!("[{}]:{}", server.host.to_ascii_lowercase(), server.port);
+        let rejection = Arc::new(Mutex::new(None));
+        let handler = PinnedHost {
+            fingerprint: hosts.get(&endpoint).cloned(),
+            endpoint,
+            rejection: rejection.clone(),
         };
-        verify_host(&identity, hosts.get(&identity.endpoint).map(String::as_str))?;
-        // Host identity is checked BEFORE sending any credentials.
-        let auth = match server.authentication {
-            Authentication::Password => {
-                if secret.0.is_empty() {
-                    return Err(Failure::Message("Authentication: password required".into()));
+        let config = Arc::new(client::Config::default());
+        let connected = runtime.block_on(async {
+            tokio::time::timeout(
+                timeout,
+                client::connect(config, (server.host.as_str(), server.port), handler),
+            )
+            .await
+        });
+        let mut session = match connected {
+            Ok(Ok(session)) => session,
+            _ => {
+                if let Some(failure) = rejection.lock().ok().and_then(|mut r| r.take()) {
+                    return Err(failure);
                 }
-                session.userauth_password(&server.username, &secret.0)
-            }
-            Authentication::OpenSsh => session.userauth_pubkey_file(
-                &server.username,
-                None,
-                &server.key_path,
-                (!secret.0.is_empty()).then_some(secret.0.as_str()),
-            ),
-            Authentication::Putty => {
-                return Err(Failure::Message(
-                    "Use the documented encrypted PuTTYgen export integration".into(),
-                ))
+                return Err(Failure::Message("SSH: connection or handshake failed/timed out (check address, port and server algorithms)".into()));
             }
         };
-        auth.map_err(|_| "SSH: Connected\nHost identity: Verified\nAuthentication: Failed (check credentials, key format/passphrase and server authentication policy)".to_string())?;
+        // The server key has been verified BEFORE key decryption or credentials.
+        let authentication_error = || {
+            Failure::Message("SSH: Connected\nHost identity: Verified\nAuthentication: Failed (check credentials, key format/passphrase and server authentication policy)".into())
+        };
+        let key = match server.authentication {
+            Authentication::Password => None,
+            Authentication::OpenSsh | Authentication::Putty => Some(
+                super::private_key::load(
+                    &server.key_path,
+                    (!secret.0.is_empty()).then_some(secret.0.as_str()),
+                )
+                .map_err(Failure::Message)?,
+            ),
+        };
+        if key.is_none() && secret.0.is_empty() {
+            return Err(Failure::Message("Authentication: password required".into()));
+        }
+        let authenticated = runtime.block_on(async {
+            tokio::time::timeout(timeout, async {
+                if let Some(key) = key {
+                    // Never fall back to legacy RSA/SHA-1 authentication.
+                    let hash = session
+                        .best_supported_rsa_hash()
+                        .await?
+                        .flatten()
+                        .unwrap_or(HashAlg::Sha256);
+                    session
+                        .authenticate_publickey(
+                            &server.username,
+                            PrivateKeyWithHashAlg::new(Arc::new(key), Some(hash)),
+                        )
+                        .await
+                } else {
+                    session
+                        .authenticate_password(&server.username, secret.0.as_str())
+                        .await
+                }
+            })
+            .await
+        });
+        match authenticated {
+            Ok(Ok(result)) if result.success() => {}
+            _ => return Err(authentication_error()),
+        }
         let mut connection = Self {
             server: server.clone(),
             session,
+            runtime,
             docker_prefix: "docker",
         };
         let candidates: Vec<_> = match server.docker_access {
@@ -180,45 +240,56 @@ impl Connection {
     }
 
     pub fn docker(&self, arguments: &str) -> Result<String, String> {
-        let started = Instant::now();
-        let mut channel = self
-            .session
-            .channel_session()
-            .map_err(|_| "SSH: channel failed or timed out")?;
-        channel
-            .handle_extended_data(ssh2::ExtendedData::Merge)
-            .map_err(|_| "SSH: output setup failed")?;
-        channel
-            .exec(&format!("{} {}", self.docker_prefix, arguments))
-            .map_err(|_| "Docker: command failed or timed out")?;
-        let mut output = Vec::new();
-        // Bound remote output. Errors never echo remote output or authentication data.
-        let mut buffer = [0_u8; 8192];
-        loop {
-            if started.elapsed() > Duration::from_secs(self.server.timeout_seconds as u64) {
-                return Err("Docker: command timed out".into());
+        self.runtime.block_on(async {
+            let deadline = tokio::time::Instant::now()
+                + Duration::from_secs(self.server.timeout_seconds as u64);
+            let mut channel =
+                tokio::time::timeout_at(deadline, self.session.channel_open_session())
+                    .await
+                    .map_err(|_| "SSH: channel timed out".to_string())?
+                    .map_err(|_| "SSH: channel failed or timed out".to_string())?;
+            let operation = async {
+                channel
+                    .exec(true, format!("{} {}", self.docker_prefix, arguments))
+                    .await
+                    .map_err(|_| "Docker: command failed or timed out".to_string())?;
+                channel
+                    .eof()
+                    .await
+                    .map_err(|_| "SSH: EOF failed".to_string())?;
+                let mut output = Vec::new();
+                let mut status = None;
+                while let Some(message) = channel.wait().await {
+                    match message {
+                        ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
+                            if output.len().saturating_add(data.len()) > 32 * 1024 * 1024 {
+                                return Err("Docker: output limit exceeded".into());
+                            }
+                            output.extend_from_slice(&data);
+                        }
+                        ChannelMsg::ExitStatus { exit_status } => status = Some(exit_status),
+                        ChannelMsg::ExitSignal { .. } => {
+                            return Err("Docker: remote command terminated by signal".into())
+                        }
+                        _ => {}
+                    }
+                }
+                let status = status.ok_or("Docker: missing exit status")?;
+                if status != 0 {
+                    return Err(docker_failure(
+                        status.try_into().unwrap_or(i32::MAX),
+                        &output,
+                    ));
+                }
+                String::from_utf8(output).map_err(|_| "Docker: invalid UTF-8 output".into())
+            };
+            let result = tokio::time::timeout_at(deadline, operation).await;
+            // Close failed/timed-out channels as well; do not leave a command channel open.
+            if !matches!(&result, Ok(Ok(_))) {
+                let _ = tokio::time::timeout(Duration::from_secs(1), channel.close()).await;
             }
-            let count = channel
-                .read(&mut buffer)
-                .map_err(|_| "Docker: output failed or timed out")?;
-            if count == 0 {
-                break;
-            }
-            output.extend_from_slice(&buffer[..count]);
-            if output.len() > 32 * 1024 * 1024 {
-                return Err("Docker: output limit exceeded".into());
-            }
-        }
-        channel
-            .wait_close()
-            .map_err(|_| "SSH: close failed or timed out")?;
-        let status = channel
-            .exit_status()
-            .map_err(|_| "Docker: missing exit status")?;
-        if status != 0 {
-            return Err(docker_failure(status, &output));
-        }
-        String::from_utf8(output).map_err(|_| "Docker: invalid UTF-8 output".into())
+            result.map_err(|_| "Docker: command timed out".to_string())?
+        })
     }
 }
 

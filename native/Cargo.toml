@@ -1,6 +1,6 @@
 [package]
 name = "containersafe-native"
-version = "0.12.0"
+version = "0.15.0"
 edition = "2021"
 build = "build.rs"
 
@@ -8,6 +8,7 @@ build = "build.rs"
 slint = "=1.18.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
 
 containersafe = { path = ".." }
 rfd = "0.15"

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "read_only": true,
+  "applications": [
+    {"application":"compose/immich","status":"needs_review","containers":["immich_server","immich_postgres","immich_redis"],"sources":[{"path":"/srv/example/immich/library","mount_type":"bind","destination":"/data","policy":"candidate_persistent_data"},{"path":"/srv/example/immich/postgres","mount_type":"bind","destination":"/var/lib/postgresql/data","policy":"requires_logical_dump"}],"databases":[{"container":"immich_postgres","engine":"PostgreSQL","required_method":"logical_dump"},{"container":"immich_redis","engine":"Redis/Valkey","required_method":"manual_persistence_review"}],"warnings":["Database consistency review","Persistence review"]},
+    {"application":"compose/mail-api","status":"needs_review","containers":["mail_api","mail_postgres"],"sources":[{"path":"/srv/example/mail/config","mount_type":"bind","destination":"/config","policy":"candidate_persistent_data"}],"databases":[{"container":"mail_postgres","engine":"PostgreSQL","required_method":"logical_dump"}],"warnings":[]},
+    {"application":"compose/mealie","status":"needs_review","containers":["mealie_web","mealie_database"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"compose/paperless-ngx","status":"needs_review","containers":["paperless_web","paperless_postgres","paperless_redis","paperless_gotenberg","paperless_tika"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"compose/media","status":"needs_review","containers":["media_player","media_library","media_indexer","media_downloads","media_proxy"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"compose/storage","status":"needs_review","containers":["storage_api","storage_database"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/snapdrop","status":"needs_review","containers":["snapdrop"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/notifications","status":"needs_review","containers":["notifications"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/phpmyadmin","status":"needs_review","containers":["phpmyadmin"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/portainer","status":"needs_review","containers":["portainer"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/vaultwarden","status":"needs_review","containers":["vaultwarden"],"sources":[],"databases":[],"warnings":[]},
+    {"application":"standalone/watchtower","status":"needs_review","containers":["watchtower"],"sources":[],"databases":[],"warnings":[]}
+  ]
+}

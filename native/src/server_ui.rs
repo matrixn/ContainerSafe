@@ -169,6 +169,9 @@ fn activate(
     s.report = tested.report;
     s.selection = selection;
     s.active = 0;
+    s.selected_container = None;
+    s.expanded = std::collections::BTreeSet::from(["compose".into(), "standalone".into()]);
+    ui.set_filter_text("".into());
     s.busy = false;
     s.dirty = true;
     render(ui, &s);
@@ -202,6 +205,8 @@ fn load_state_for_server(dir: &Path) -> (State, String) {
             report,
             selection,
             active: 0,
+            selected_container: None,
+            expanded: std::collections::BTreeSet::from(["compose".into(), "standalone".into()]),
             dirty: false,
             busy: false,
             server: None,

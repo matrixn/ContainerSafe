@@ -41,14 +41,14 @@ If the executable is missing from PATH, repeat the two version checks with the a
 
 ## Credentials and keys
 
-- **Password:** authenticated through libssh2, in process, without putting a password in command arguments. Password authentication must be enabled by the SSH server. Keyboard-interactive/PAM-only accounts are currently unsupported.
-- **Windows private keys:** libssh2 uses native WinCNG. Encrypted and unencrypted RSA keys in traditional PEM (`BEGIN RSA PRIVATE KEY`) are supported. Modern `BEGIN OPENSSH PRIVATE KEY` containers (including RSA), Ed25519, ECDSA and PKCS#8 files are unsupported by this locked build and produce an explicit compatibility error. No automatic conversion or fallback authentication is performed.
-- **Linux/macOS private keys:** retain libssh2 with vendored OpenSSL, supporting encrypted OpenSSH Ed25519 and compatible RSA/ECDSA keys. Public `.pub` files are rejected. Files remain at the selected path.
-- **PuTTY PPK:** direct parsing is unsupported by the selected SSH library. Install PuTTYgen from the official PuTTY distribution, load the PPK, use Conversions → Export OpenSSH key, preserve/set a passphrase, save separately and select **OpenSSH Private Key** in ContainerSafe. Never export an unencrypted key as a workaround. The PPK option explains this integration and blocks a misleading successful test. ContainerSafe never runs a converter or writes an unencrypted key.
+- **Password:** authenticated through `russh`, in process, without putting a password in command arguments. Password authentication must be enabled by the SSH server. Keyboard-interactive/PAM-only accounts are currently unsupported by ContainerSafe's interface.
+- **Private keys on all platforms:** `russh` 0.64.1 with the explicit `ring` backend replaces libssh2/WinCNG/OpenSSL. The fixtures verify encrypted OpenSSH Ed25519, plain OpenSSH Ed25519, RSA PEM/plain/encrypted, encrypted RSA OpenSSH/PKCS#8, and encrypted ECDSA P-256 PEM/OpenSSH/PKCS#8. `.pub` files are rejected. Existing profile IDs, key paths, passwords and remembered passphrases retain their meaning.
+- **Legacy encrypted PEM:** AES-128-CBC and AES-256-CBC RSA/EC containers are decoded read-only using RustCrypto AES/CBC and the standard legacy PEM MD5 derivation. This compatibility code compensates for the pinned russh parser's incomplete legacy PEM support. It does not enable MD5, CBC or SHA-1 in the SSH negotiation. Other PEM encryption ciphers produce an explicit unsupported-format error. No key is rewritten and no decrypted key is saved. Key input is limited to 1 MiB.
+- **PuTTY PPK:** direct PPK import remains disabled in ContainerSafe. Although russh exposes PPK parsing, testing did not establish reliable compatibility across the tested PPK variants, so the application retains the existing explicit workflow. Install PuTTYgen from the official PuTTY distribution, load the PPK, use Conversions → Export OpenSSH key (or force the modern format), preserve/set a passphrase, save separately and select **OpenSSH Private Key** in ContainerSafe. Never export an unencrypted key as a workaround. ContainerSafe never runs a converter or writes an unencrypted key.
 
-On Windows the PPK must contain an RSA key. Use **Export OpenSSH key**, which exports RSA as traditional PEM, rather than **Export OpenSSH key (force new file format)**. Exporting an Ed25519 or ECDSA PPK does not make that algorithm compatible with this WinCNG build. The exported encrypted RSA format is covered by the SSH fixture; direct PPK remains blocked.
+Unlike the earlier Windows WinCNG build, an exported Ed25519/ECDSA key can now be used. Traditional encrypted RSA PEM export also remains supported. Hardware security keys, Pageant/ssh-agent login and SSH certificates are not exposed as authentication methods in this version.
 
-WinCNG also lacks Ed25519 host keys and has ECDSA disabled in the locked build. A server must offer a compatible host key, such as RSA with SHA-2. Host-key verification is unchanged: if negotiation selects a different host key than the pinned fingerprint, the connection is blocked for explicit review. Existing pins and key files are never rewritten automatically. No legacy algorithm is enabled to work around negotiation failures.
+RSA, Ed25519 and ECDSA host-key fingerprints are checked against the existing endpoint SHA256 pins **before** authentication or private-key decryption. SHA256 uses the same SSH public-key wire encoding as the previous backend. A new transport may negotiate another host-key algorithm offered by the same server: if its fingerprint differs, the connection remains blocked for explicit review. Independently compare that fingerprint with the server's actual host key before approving it. Existing pins are never rewritten automatically. Host certificates are rejected without a separate CA trust policy. RSA user authentication does not fall back to SHA-1.
 
 Remember stores the password/passphrase under service `ContainerSafe.SSH`, account `<server UUID>` using `keyring`: Windows Credential Manager, macOS Keychain or Linux Secret Service. Remember failures fail the save. Without Remember, secrets are held only in the application session; Rust secret holders are zeroized on drop. The Slint masked input and SSH library may maintain internal memory copies; this is not a guarantee of zeroized process memory. Profile JSON contains metadata, key paths, UUID references and public host fingerprints, never secret values or private-key contents. Edit opens blank secret fields; credentials are never revealed. Deleting a profile deletes its stored credential and preserves local cached backup data and remote data.
 
@@ -70,7 +70,7 @@ CLI commands use the saved default or `--server UUID`. CLI does not prompt for s
 
 ## Build and verify
 
-Windows needs MSVC and Windows SDK. The Windows `ssh2` dependency enables neither `vendored-openssl` nor `openssl-on-win32`, so libssh2 builds its native WinCNG backend and links Windows crypto libraries. No OpenSSL installation, DLL, vendored OpenSSL compilation or Perl setup is needed. Linux/macOS retain vendored OpenSSL and its normal compiler/Perl prerequisites; Linux additionally needs Secret Service development libraries.
+Windows needs MSVC and Windows SDK. `russh` has default features disabled and explicitly enables `ring` and `rsa`; AWS-LC is not selected. Ring still builds native code, but there is no OpenSSL installation, DLL, vendored OpenSSL compilation or Perl setup. Linux full CLI/desktop builds still need the existing Secret Service development libraries (`libdbus-1-dev`, `pkg-config` on Ubuntu); the standalone agent-only build excludes that component. macOS was not tested in this Windows session.
 
 Check the active Windows feature graph with:
 
@@ -78,7 +78,7 @@ Check the active Windows feature graph with:
 cargo tree --locked --manifest-path native/Cargo.toml --target x86_64-pc-windows-msvc -e features -i openssl-sys
 ```
 
-Expected: nothing to print (or no matching package), with no OpenSSL dependency active on Windows. OpenSSL packages can remain in Cargo.lock for non-Windows targets. The older `use-local-build-tools.ps1 -UseOpenSslCache` helper is unnecessary for Windows WinCNG builds. Existing build caches can be reused; do not run `cargo clean` for this switch.
+Expected: no matching package. Also inspect `cargo tree --locked --manifest-path native/Cargo.toml -e features -i russh` and `-i ring`. Neither `openssl-sys`, `libssh2-sys` nor `aws-lc-sys` should appear in the active native build graph. The old OpenSSL cache helper is obsolete for this transport. Existing build caches are reused; do not run `cargo clean`.
 
 ```powershell
 cargo fmt
@@ -95,10 +95,19 @@ Optional SSH integration fixture (Python with `paramiko`; loopback only) and dis
 
 ```powershell
 python -m pip install paramiko
-cargo test -- --ignored
+cargo test --locked --test ssh_integration -- --ignored
 ```
 
-Set `CONTAINERSAFE_TEST_PYTHON` if the interpreter is not named `python`. The SSH fixture tests password authentication, encrypted/plain RSA PEM authentication, wrong passphrases, unknown/changed host blocking, container discovery and Docker permissions without a NAS or Docker daemon. Windows additionally checks explicit rejection of unsupported key formats; non-Windows targets exercise the OpenSSL key formats. These checks do not convert or replace production keys.
+Set `CONTAINERSAFE_TEST_PYTHON` if the interpreter is not named `python`. The loopback fixture tests the key formats listed above, wrong passphrases, RSA/Ed25519/ECDSA host pins, rejection before any credentials are sent, Docker discovery, Synology/sudo permissions, timeouts, missing exit status and output overflow. Original key bytes are compared after login. It uses no NAS or real Docker daemon and does not touch production keys. The OS credential test remains separately opt-in (`cargo test --locked os_credential_roundtrip_and_removal -- --ignored`).
+
+### Test v0.14 with an existing Windows profile
+
+1. Close any older running ContainerSafe executable and start `cargo run --locked --manifest-path native/Cargo.toml`.
+2. Open **File → Servers...**, edit your server and choose **OpenSSH Private Key**. Keep the existing Ed25519 key path, username, SSH port (2022 for the configured Synology), Docker access and the key's actual passphrase; leave the passphrase empty only for an unencrypted key. A passphrase is not the SSH account password. Edit forms open with a blank secret field.
+3. Click **Test connection**. Existing matching pins should be reused; a different negotiated host key still requires independent fingerprint verification and explicit approval.
+4. Expect `SSH: Connected`, `Host identity: Verified`, `Authentication: Successful`, `Docker: Available` and the container count. Save the profile after the successful test. Docker permission errors remain separate from SSH/key errors.
+
+The v0.14 validation uses synthetic loopback servers; no live NAS test was performed automatically.
 
 Manual UI checks: first launch/cancel; enter invalid fields; test and approve/reject fingerprint; save; add a second server; set default; open a nondefault server; edit fields after a successful test; cancel a slow test; remove a profile; relaunch with an offline default; verify version/About and keyboard menus. Live production SSH access and Linux/macOS credential integration require separate validation.
 

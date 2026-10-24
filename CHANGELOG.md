@@ -2,6 +2,35 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.15 — 2026-10-24
+
+- Redesign the desktop workspace with a light slate/white palette, teal primary actions, readable typography, section cards, consistent spacing and the actual application logo beside the name.
+- Rename Applications to Containers. Add a searchable expandable Compose → project → container and Standalone → container explorer, preserving original backend application identities and source-selection scope.
+- Separate Backup plans from the inventory view: show selected operations, excluded items and pending decisions per stack/container, with Review links back to the correct project.
+- Replace cycling decision buttons with explicit policy-aware dropdowns. Keep canonical source/database indices across Storage/Databases filters and retain protection against including raw database directories.
+- Add shared light buttons, selectors and checkboxes with pointer cursors, hover/pressed/disabled/focus feedback; update server setup, manager and modal colors while preserving selectable/copyable detail text.
+- Add focused tree/plan/policy tests, a 25-container synthetic visual fixture and debug-only `--preview-report` mode that never loads server profiles or opens network connections.
+
+## 0.14 — 2026-10-24
+
+- Replace libssh2/WinCNG with pinned `russh` and the explicit `ring` backend for desktop/CLI SSH on all platforms; remove OpenSSL/libssh2 and avoid the default AWS-LC backend.
+- Restore encrypted and plain OpenSSH Ed25519 login, modern RSA and ECDSA key containers and encrypted PKCS#8. Preserve encrypted RSA/EC PEM AES-128/256-CBC files with a read-only RustCrypto compatibility decoder; unsupported legacy encryption is reported explicitly.
+- Preserve endpoint SHA256 fingerprint pins and require approval before authentication/key decryption. Accept modern Ed25519/ECDSA host keys, reject untrusted/changed keys, and keep host certificates disabled without a separate CA policy.
+- Preserve Docker command discovery, Synology paths, passwordless sudo diagnostics, bounded output and timeouts. Reject missing exit status and terminated commands.
+- Verify password/key login and Docker discovery against loopback SSH fixtures with RSA/Ed25519/ECDSA host keys, wrong passwords/passphrases, immutable source keys, output overflow and stalled commands. Keep PPK on the explicit manual encrypted export workflow; direct PPK, hardware keys and keyboard-interactive remain unsupported by this interface.
+- Update shared/native version metadata and make the agent lab follow the current executable version.
+
+## 0.13 — 2026-10-24
+
+- Add `containersafe-agent`, a Linux single-request stdio executable designed for SSH invocation, reusing the shared Restic engine without listening on a network port.
+- Allow an agent-only `--no-default-features` build without desktop SSH/keyring dependencies, OpenSSL/libssh2 or D-Bus; preserve the normal CLI/desktop defaults.
+- Define a versioned, bounded JSON protocol with request/job UUIDs, strict request fields and structured secret-free errors; reject unknown protocol versions and operations.
+- Authorize operations from host-controlled job configuration. Client requests cannot select executables, repositories, passwords, backup paths or arbitrary restore targets.
+- Require protected Linux configuration/password files, reject symlinks and unsafe permissions, and refuse configured backups that contain known agent secret/config files.
+- Constrain restores to fresh child directories of the configured restore root and reject targets overlapping configured backup sources. Existing Restic snapshot-ID, repository-overlap and verification checks remain in force.
+- Add policy/path/permission tests and a disposable Linux process-level lab covering two real snapshots, two verified restores, denied operations, injected fields, unsafe targets and insecure secrets. Document Linux build, protocol, SSH invocation and test instructions in Romanian.
+- Desktop integration, database consistency, automatic deployment, scheduling and agent packaging remain future work.
+
 ## 0.12 — 2026-10-24
 
 - Implement the reusable Restic engine planned in the original v0.8 discussion: typed local init, backup, snapshots, check and isolated restore operations shared by the CLI, desktop core and future agent.
