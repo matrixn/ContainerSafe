@@ -7,7 +7,7 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub mod servers;
-pub const VERSION: &str = "0.10";
+pub const VERSION: &str = "0.11";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {

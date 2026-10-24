@@ -78,6 +78,7 @@ export component ServerForm inherits Rectangle {
     in property <string> result;
     in property <bool> busy;
     in property <bool> tested;
+    in property <string> ssh-key-compatibility;
     private property <int> step: 0;
     callback edited;
     callback browse;
@@ -144,6 +145,7 @@ export component ServerForm inherits Rectangle {
                     if root.authentication == 0 : Hint { text: "Password login uses the password of your SSH account on the remote server."; }
                     if root.authentication == 2 : VerticalLayout {
                         spacing: 7px;
+                        Hint { text: root.ssh-key-compatibility; }
                         FieldLabel { label: "Private key file"; help: "Choose your private OpenSSH key on this computer, not its .pub public-key file. The matching public key must be in the remote user's authorized_keys. Your private key file is not uploaded to the server."; }
                         HorizontalLayout { spacing: 10px;
                             LineEdit { text <=> root.key-path; placeholder-text: "Choose a private key on this computer"; min-height: 40px; edited => { root.edited(); } }
@@ -152,7 +154,7 @@ export component ServerForm inherits Rectangle {
                     }
                     if root.authentication == 1 : VerticalLayout {
                         spacing: 14px;
-                        Hint { text: "Already using PuTTY? Export your key once\n\n1. Open the .ppk file in PuTTYgen.\n2. Keep a passphrase and choose Conversions > Export OpenSSH key.\n3. Save the exported private key on this computer.\n4. Choose OpenSSH below and browse to that exported file.\n\nPPK files cannot be used directly. Your original key is unchanged."; }
+                        Hint { text: "Already using PuTTY? Export your key once\n\n1. Open the .ppk file in PuTTYgen.\n2. Keep a passphrase and choose Conversions > Export OpenSSH key.\n3. Save the exported private key on this computer.\n4. Choose OpenSSH below and browse to that exported file.\n\nPPK files cannot be used directly. Your original key is unchanged.\n\n" + root.ssh-key-compatibility; }
                         Button { text: "Use my exported OpenSSH key"; clicked => { root.authentication = 2; root.secret = ""; root.edited(); } }
                     }
                     if root.authentication != 1 : VerticalLayout {

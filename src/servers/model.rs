@@ -2,6 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+pub const SSH_KEY_COMPATIBILITY: &str = if cfg!(windows) {
+    "Windows WinCNG supports RSA private keys in traditional PEM format (BEGIN RSA PRIVATE KEY), including encrypted keys. Ed25519, ECDSA, PKCS#8 and modern BEGIN OPENSSH PRIVATE KEY files are unsupported by this build. Existing keys are never converted automatically."
+} else {
+    "Linux/macOS use libssh2 with OpenSSL: encrypted OpenSSH Ed25519 and compatible RSA/ECDSA keys are supported. Existing keys are never converted automatically."
+};
+
 pub fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -103,7 +109,11 @@ impl Server {
                 .read_to_string(&mut header)
                 .map_err(|_| "Invalid private-key format")?;
             if self.authentication == Authentication::Putty {
-                return Err("PPK integration: open the key in PuTTYgen, export an encrypted OpenSSH private key, then select OpenSSH here. ContainerSafe never converts or decrypts key files automatically.".into());
+                return Err(format!("PPK integration: open the key in PuTTYgen, export an encrypted OpenSSH private key, then select OpenSSH here. ContainerSafe never converts or decrypts key files automatically. {SSH_KEY_COMPATIBILITY}"));
+            }
+            #[cfg(windows)]
+            if !header.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
+                return Err(SSH_KEY_COMPATIBILITY.into());
             }
             if !header.starts_with("-----BEGIN OPENSSH PRIVATE KEY-----")
                 && !header.starts_with("-----BEGIN RSA PRIVATE KEY-----")

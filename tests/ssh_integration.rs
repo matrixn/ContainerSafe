@@ -15,6 +15,7 @@ struct Fixture {
     server: Server,
     hosts: BTreeMap<String, String>,
     key: std::path::PathBuf,
+    key_files: BTreeMap<String, std::path::PathBuf>,
 }
 impl Drop for Fixture {
     fn drop(&mut self) {
@@ -55,12 +56,14 @@ impl Fixture {
             value["fingerprint"].as_str().unwrap().into(),
         )]);
         let key = value["key_path"].as_str().unwrap().into();
+        let key_files = serde_json::from_value(value["key_files"].clone()).unwrap();
         Self {
             child,
             _directory: directory,
             server,
             hosts,
             key,
+            key_files,
         }
     }
 }
@@ -73,8 +76,9 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
     let initial = Connection::open(&f.server, &password, &BTreeMap::new());
     assert!(
         matches!(&initial, Err(Failure::UnknownHost(_))),
-        "Unexpected SSH result: {:?}",
-        initial.err()
+        "Unexpected SSH result: {:?}\n{}",
+        initial.err(),
+        std::fs::read_to_string(f._directory.path().join("ssh.log")).unwrap_or_default()
     );
     let changed = BTreeMap::from([(
         format!("[127.0.0.1]:{}", f.server.port),
@@ -112,8 +116,41 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
     f.server.docker_access = DockerAccess::Automatic;
     f.server.username = "fixture".into();
     f.server.authentication = Authentication::OpenSsh;
+    for (format, passphrase) in [("rsa_pem", ""), ("rsa_pem_encrypted", "fixture-passphrase")] {
+        f.server.key_path = f.key_files[format].clone();
+        let connection = Connection::open(&f.server, &Secret(passphrase.into()), &f.hosts)
+            .unwrap_or_else(|error| panic!("{format} SSH should succeed: {error:?}"));
+        assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
+    }
+    f.server.key_path = f.key_files["rsa_pem_encrypted"].clone();
+    assert!(Connection::open(&f.server, &Secret("wrong-passphrase".into()), &f.hosts).is_err());
+
+    for (format, path) in std::iter::once(("ed25519_openssh", f.key.clone())).chain(
+        [
+            "rsa_openssh_encrypted",
+            "rsa_pkcs8_encrypted",
+            "ecdsa_pem_encrypted",
+        ]
+        .into_iter()
+        .map(|name| (name, f.key_files[name].clone())),
+    ) {
+        f.server.key_path = path;
+        let result = Connection::open(&f.server, &Secret("fixture-passphrase".into()), &f.hosts);
+        if cfg!(windows) {
+            assert!(
+                matches!(result, Err(Failure::Message(m)) if m.contains("WinCNG")),
+                "{format} must report the WinCNG limitation explicitly"
+            );
+            println!("WinCNG unsupported format verified: {format}");
+        } else {
+            let connection = result.unwrap_or_else(|error| panic!("{format}: {error:?}"));
+            assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
+        }
+    }
+
+    f.server.authentication = Authentication::Putty;
     f.server.key_path = f.key.clone();
-    let connection = Connection::open(&f.server, &Secret("fixture-passphrase".into()), &f.hosts)
-        .unwrap_or_else(|_| panic!("Encrypted Ed25519 SSH should succeed"));
-    assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
+    assert!(
+        matches!(Connection::open(&f.server, &Secret::default(), &f.hosts), Err(Failure::Message(m)) if m.contains("PPK integration"))
+    );
 }

@@ -66,13 +66,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config perl libdbus-1-dev libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libudev-dev libinput-dev libgbm-dev libegl1-mesa-dev libgl1-mesa-dev desktop-file-utils xvfb
-      - name: Native Windows Perl for OpenSSL
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $perl = 'C:\Strawberry\perl\bin\perl.exe'
-          if (!(Test-Path -LiteralPath $perl)) { throw 'Native Windows Perl is missing from the runner image' }
-          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         if: runner.os == 'Windows'
         with:

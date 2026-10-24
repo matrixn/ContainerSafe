@@ -1,6 +1,6 @@
 [package]
 name = "containersafe-native"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 build = "build.rs"
 
@@ -12,6 +12,9 @@ serde_json = "1"
 containersafe = { path = ".." }
 rfd = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
 
 [build-dependencies]
 slint-build = "=1.18.1"

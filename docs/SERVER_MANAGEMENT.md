@@ -1,4 +1,4 @@
-# Server management — ContainerSafe 0.09
+# Server management — ContainerSafe 0.11
 
 ## Start and configure
 
@@ -42,8 +42,13 @@ If the executable is missing from PATH, repeat the two version checks with the a
 ## Credentials and keys
 
 - **Password:** authenticated through libssh2, in process, without putting a password in command arguments. Password authentication must be enabled by the SSH server. Keyboard-interactive/PAM-only accounts are currently unsupported.
-- **OpenSSH private key:** encrypted or unencrypted Ed25519 and compatible RSA/ECDSA keys via libssh2/OpenSSL. Public `.pub` files are rejected. Files remain at the selected path.
+- **Windows private keys:** libssh2 uses native WinCNG. Encrypted and unencrypted RSA keys in traditional PEM (`BEGIN RSA PRIVATE KEY`) are supported. Modern `BEGIN OPENSSH PRIVATE KEY` containers (including RSA), Ed25519, ECDSA and PKCS#8 files are unsupported by this locked build and produce an explicit compatibility error. No automatic conversion or fallback authentication is performed.
+- **Linux/macOS private keys:** retain libssh2 with vendored OpenSSL, supporting encrypted OpenSSH Ed25519 and compatible RSA/ECDSA keys. Public `.pub` files are rejected. Files remain at the selected path.
 - **PuTTY PPK:** direct parsing is unsupported by the selected SSH library. Install PuTTYgen from the official PuTTY distribution, load the PPK, use Conversions → Export OpenSSH key, preserve/set a passphrase, save separately and select **OpenSSH Private Key** in ContainerSafe. Never export an unencrypted key as a workaround. The PPK option explains this integration and blocks a misleading successful test. ContainerSafe never runs a converter or writes an unencrypted key.
+
+On Windows the PPK must contain an RSA key. Use **Export OpenSSH key**, which exports RSA as traditional PEM, rather than **Export OpenSSH key (force new file format)**. Exporting an Ed25519 or ECDSA PPK does not make that algorithm compatible with this WinCNG build. The exported encrypted RSA format is covered by the SSH fixture; direct PPK remains blocked.
+
+WinCNG also lacks Ed25519 host keys and has ECDSA disabled in the locked build. A server must offer a compatible host key, such as RSA with SHA-2. Host-key verification is unchanged: if negotiation selects a different host key than the pinned fingerprint, the connection is blocked for explicit review. Existing pins and key files are never rewritten automatically. No legacy algorithm is enabled to work around negotiation failures.
 
 Remember stores the password/passphrase under service `ContainerSafe.SSH`, account `<server UUID>` using `keyring`: Windows Credential Manager, macOS Keychain or Linux Secret Service. Remember failures fail the save. Without Remember, secrets are held only in the application session; Rust secret holders are zeroized on drop. The Slint masked input and SSH library may maintain internal memory copies; this is not a guarantee of zeroized process memory. Profile JSON contains metadata, key paths, UUID references and public host fingerprints, never secret values or private-key contents. Edit opens blank secret fields; credentials are never revealed. Deleting a profile deletes its stored credential and preserves local cached backup data and remote data.
 
@@ -65,15 +70,15 @@ CLI commands use the saved default or `--server UUID`. CLI does not prompt for s
 
 ## Build and verify
 
-Windows needs MSVC/SDK and a native Windows Perl for vendored OpenSSL. Git's minimal MSYS Perl is insufficient. Set `OPENSSL_SRC_PERL` to Strawberry Perl's executable if it is not on PATH. No OpenSSL DLL installation is needed. Linux needs its normal C compiler, OpenSSL build prerequisites and Secret Service development libraries; Linux/macOS desktop builds have not been validated in this change.
+Windows needs MSVC and Windows SDK. The Windows `ssh2` dependency enables neither `vendored-openssl` nor `openssl-on-win32`, so libssh2 builds its native WinCNG backend and links Windows crypto libraries. No OpenSSL installation, DLL, vendored OpenSSL compilation or Perl setup is needed. Linux/macOS retain vendored OpenSSL and its normal compiler/Perl prerequisites; Linux additionally needs Secret Service development libraries.
 
-This workspace has a portable Perl under the ignored `target/build-tools/` directory and a compiled static OpenSSL cache. Reuse that prepared environment in a PowerShell session before the commands below:
+Check the active Windows feature graph with:
 
 ```powershell
-. .\scripts\use-local-build-tools.ps1 -UseOpenSslCache
+cargo tree --locked --manifest-path native/Cargo.toml --target x86_64-pc-windows-msvc -e features -i openssl-sys
 ```
 
-This changes only the current process environment. Omit `-UseOpenSslCache` after dependency upgrades or when building from scratch; the helper then selects the portable Perl, if available, and Cargo builds its vendored OpenSSL normally. A clean checkout needs its own build prerequisites. No toolchain directories or downloaded libraries are included in Git.
+Expected: nothing to print (or no matching package), with no OpenSSL dependency active on Windows. OpenSSL packages can remain in Cargo.lock for non-Windows targets. The older `use-local-build-tools.ps1 -UseOpenSslCache` helper is unnecessary for Windows WinCNG builds. Existing build caches can be reused; do not run `cargo clean` for this switch.
 
 ```powershell
 cargo fmt
@@ -93,16 +98,16 @@ python -m pip install paramiko
 cargo test -- --ignored
 ```
 
-Set `CONTAINERSAFE_TEST_PYTHON` if the interpreter is not named `python`. The SSH fixture tests real password authentication, encrypted Ed25519 private-key authentication, unknown/changed host blocking, bad credentials, container discovery and Docker permissions without a NAS or Docker daemon.
+Set `CONTAINERSAFE_TEST_PYTHON` if the interpreter is not named `python`. The SSH fixture tests password authentication, encrypted/plain RSA PEM authentication, wrong passphrases, unknown/changed host blocking, container discovery and Docker permissions without a NAS or Docker daemon. Windows additionally checks explicit rejection of unsupported key formats; non-Windows targets exercise the OpenSSL key formats. These checks do not convert or replace production keys.
 
 Manual UI checks: first launch/cancel; enter invalid fields; test and approve/reject fingerprint; save; add a second server; set default; open a nondefault server; edit fields after a successful test; cancel a slow test; remove a profile; relaunch with an offline default; verify version/About and keyboard menus. Live production SSH access and Linux/macOS credential integration require separate validation.
 
 ## Versioning
 
-The application displays **0.09**. Cargo requires semantic versions without leading zeroes, so both packages use **0.9.0**. To advance the display by exactly 0.01 and synchronize package versions:
+The application displays **0.11**. Cargo requires semantic versions without leading zeroes, so both packages use **0.11.0**. To advance the display by exactly 0.01 and synchronize package versions:
 
 ```powershell
-.\scripts\bump-version.ps1  # 0.09 -> 0.10, Cargo 0.10.0
+.\scripts\bump-version.ps1  # 0.11 -> 0.12, Cargo 0.12.0
 ```
 
 The display value is shared by GUI and CLI from `containersafe::VERSION`. Refresh both lockfiles through Cargo validation before releasing. This task does not create a Git tag or publish a release.

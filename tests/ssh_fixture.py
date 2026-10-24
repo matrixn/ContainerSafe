@@ -11,14 +11,32 @@ import time
 import paramiko
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
 root = Path(sys.argv[1])
+paramiko.util.log_to_file(str(root / "ssh.log"))
 host_key = paramiko.RSAKey.generate(2048)
 private = Ed25519PrivateKey.generate()
 key_path = root / "fixture_ed25519"
 key_path.write_bytes(private.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH,
                                          serialization.BestAvailableEncryption(b"fixture-passphrase")))
 client_key = paramiko.Ed25519Key.from_private_key_file(str(key_path), "fixture-passphrase")
+key_files = {}
+rsa_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+ecdsa_private = ec.generate_private_key(ec.SECP256R1())
+for name, private_key, key_format, encrypted in [
+    ("rsa_pem", rsa_private, serialization.PrivateFormat.TraditionalOpenSSL, False),
+    ("rsa_pem_encrypted", rsa_private, serialization.PrivateFormat.TraditionalOpenSSL, True),
+    ("rsa_openssh_encrypted", rsa_private, serialization.PrivateFormat.OpenSSH, True),
+    ("rsa_pkcs8_encrypted", rsa_private, serialization.PrivateFormat.PKCS8, True),
+    ("ecdsa_pem_encrypted", ecdsa_private, serialization.PrivateFormat.TraditionalOpenSSL, True),
+]:
+    destination = root / name
+    destination.write_bytes(private_key.private_bytes(serialization.Encoding.PEM, key_format,
+        serialization.BestAvailableEncryption(b"fixture-passphrase") if encrypted else serialization.NoEncryption()))
+    key_files[name] = str(destination)
+client_keys = [client_key, paramiko.RSAKey.from_private_key_file(key_files["rsa_pem"]),
+               paramiko.ECDSAKey.from_private_key_file(key_files["ecdsa_pem_encrypted"], "fixture-passphrase")]
 
 
 class Server(paramiko.ServerInterface):
@@ -29,7 +47,7 @@ class Server(paramiko.ServerInterface):
         return paramiko.AUTH_SUCCESSFUL if username in ("fixture", "denied", "synology") and password == "fixture-password" else paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, key):
-        return paramiko.AUTH_SUCCESSFUL if username == "fixture" and key == client_key else paramiko.AUTH_FAILED
+        return paramiko.AUTH_SUCCESSFUL if username == "fixture" and key in client_keys else paramiko.AUTH_FAILED
 
     def check_channel_request(self, kind, chanid):
         return paramiko.OPEN_SUCCEEDED if kind == "session" else paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
@@ -66,11 +84,15 @@ class Server(paramiko.ServerInterface):
 listener = socket.socket()
 listener.bind(("127.0.0.1", 0))
 listener.listen()
-print(json.dumps({"port": listener.getsockname()[1], "fingerprint": "SHA256:" + base64.b64encode(hashlib.sha256(host_key.asbytes()).digest()).decode().rstrip("="), "key_path": str(key_path)}), flush=True)
+print(json.dumps({"port": listener.getsockname()[1], "fingerprint": "SHA256:" + base64.b64encode(hashlib.sha256(host_key.asbytes()).digest()).decode().rstrip("="), "key_path": str(key_path), "key_files": key_files}), flush=True)
 
 
 def serve(sock):
     transport = paramiko.Transport(sock)
+    # This fixture has no DH moduli file: do not advertise group exchange and
+    # then negotiate a different algorithm. Keep the supported strong defaults.
+    algorithms = transport.get_security_options()
+    algorithms.kex = tuple(name for name in algorithms.kex if "group-exchange" not in name)
     transport.add_server_key(host_key)
     try:
         transport.start_server(server=Server())

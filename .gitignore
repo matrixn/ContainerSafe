@@ -1,5 +1,6 @@
 /target/
 /native/target/
+/.cargo/config.toml
 /dist/
 /.wix/
 **/*.rs.bk

@@ -2,8 +2,10 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
-## Unreleased
+## 0.11 — 2026-10-24
 
+- Use native WinCNG for Windows SSH, removing Windows OpenSSL/Perl build requirements while preserving vendored OpenSSL on Linux/macOS. Report WinCNG key-format limitations explicitly and test encrypted RSA PEM authentication without weakening host-key verification.
+- Embed the ContainerSafe icon and Windows application metadata in the native executable.
 - Run installer automation only on version-tag pushes (`v*`); normal branch pushes, release publication and manual dispatch no longer start builds.
 - Selectable read-only display text across the desktop, with Ctrl+A/Ctrl+C, full-value copying for shortened labels, a Copy report action and click-to-open copyable field help.
 - Probe Synology Container Manager and legacy Docker package paths when Docker is absent from the SSH PATH.

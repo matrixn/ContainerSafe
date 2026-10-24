@@ -45,6 +45,7 @@ component NavLine inherits Rectangle {
 
 export component ContainerSafeWindow inherits Window {
     title: "ContainerSafe " + root.app-version + " — " + root.active-server;
+    icon: @image-url("../assets/icons/containersafe.png");
     preferred-width: 1260px;
     preferred-height: 790px;
     min-width: 1060px;
@@ -76,6 +77,7 @@ export component ContainerSafeWindow inherits Window {
     callback validate-selection();
 
     in-out property <string> app-version;
+    in property <string> ssh-key-compatibility;
     in-out property <string> active-server: "Disconnected";
     in-out property <int> dialog: 0;
     in-out property <[ServerRow]> servers;
@@ -480,6 +482,7 @@ export component ContainerSafeWindow inherits Window {
             width: min(820px, parent.width - 48px); height: parent.height - 24px;
             server-name <=> root.form-name; host <=> root.form-host; port <=> root.form-port;
             username <=> root.form-user; authentication <=> root.form-auth; key-path <=> root.form-key;
+            ssh-key-compatibility: root.ssh-key-compatibility;
             secret <=> root.form-secret; remember <=> root.form-remember; docker-access <=> root.form-docker;
             timeout <=> root.form-timeout; result: root.connection-result; busy: root.test-busy; tested: root.test-passed;
             edited => { root.form-edited(); } test => { root.test-server(); } save => { root.save-server(); }

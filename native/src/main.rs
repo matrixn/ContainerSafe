@@ -468,6 +468,7 @@ fn create_main_window(
         render(&ui, &guard);
     }
     ui.set_app_version(containersafe::VERSION.into());
+    ui.set_ssh_key_compatibility(containersafe::servers::model::SSH_KEY_COMPATIBILITY.into());
     ui.set_status_message(first_status.into());
     ui.set_validation_message("Selection not verified for execution".into());
 

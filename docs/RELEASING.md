@@ -28,10 +28,10 @@ SHA256SUMS.txt
 ## Later releases
 
 ```powershell
-.\scripts\bump-version.ps1          # 0.10 -> 0.11; both Cargo manifests -> 0.11.0
+.\scripts\bump-version.ps1          # 0.11 -> 0.12; both Cargo manifests -> 0.12.0
 cargo check                        # Refresh the root lockfile
 cargo check --manifest-path native/Cargo.toml
-python scripts/release_metadata.py --tag v0.11
+python scripts/release_metadata.py --tag v0.12
 ```
 
 Review the changelog, commit and push the manifests, both updated lockfiles, shared display version and changelog, then create the matching version tag. Subsequent versions advance by 0.01. The workflow rejects a tag that differs from the display version or stale Cargo lockfiles. MSI requires a numeric product version: display `0.11` maps to installer/Cargo version `0.11.0`.
@@ -50,7 +50,7 @@ No personal access token or publishing secret is required. The workflow uses Git
 
 Windows CI builds use the static MSVC CRT, so a separately installed Visual C++ runtime is not required. The graphical release executable uses the Windows GUI subsystem and does not open a console window.
 
-**Ubuntu/Debian:** download the DEB and install with `sudo apt install ./ContainerSafe-0.09-linux-amd64.deb`. The desktop app appears in the application launcher; CLI: `containersafe`, GUI command: `containersafe-gui`. The build targets Ubuntu 22.04/glibc 2.35 or newer x86-64 distributions. A graphical X11/Wayland session and desktop libraries are required. Remembered credentials require a running/unlocked Secret Service provider such as GNOME Keyring. The tar.gz contains a `usr/` hierarchy for manual installation; it is not an AppImage or a fully static portable bundle and does not install dependencies automatically. Linux GUI startup is smoke-tested under Xvfb, without a production SSH server.
+**Ubuntu/Debian:** download the DEB and install with `sudo apt install ./ContainerSafe-0.11-linux-amd64.deb`. The desktop app appears in the application launcher; CLI: `containersafe`, GUI command: `containersafe-gui`. The build targets Ubuntu 22.04/glibc 2.35 or newer x86-64 distributions. A graphical X11/Wayland session and desktop libraries are required. Remembered credentials require a running/unlocked Secret Service provider such as GNOME Keyring. The tar.gz contains a `usr/` hierarchy for manual installation; it is not an AppImage or a fully static portable bundle and does not install dependencies automatically. Linux GUI startup is smoke-tested under Xvfb, without a production SSH server.
 
 Neither installer configures Docker, grants remote sudo access, imports local backup plans, bundles private credentials, or installs an SSH key. The local Restic laboratory requires a separately installed `restic` executable; Restic is not bundled.
 
@@ -58,7 +58,7 @@ The GUI startup check uses a temporary `CONTAINERSAFE_CONFIG_DIR` so it cannot l
 
 ## Local package validation
 
-Windows build prerequisites are documented in [SERVER_MANAGEMENT.md](SERVER_MANAGEMENT.md). For this prepared workspace, optionally dot-source `scripts/use-local-build-tools.ps1 -UseOpenSslCache` first. Use Python 3.11+ for the release helper scripts.
+Windows build prerequisites are documented in [SERVER_MANAGEMENT.md](SERVER_MANAGEMENT.md). Windows SSH uses WinCNG and needs no OpenSSL/Perl setup or OpenSSL cache helper. Linux/macOS retain vendored OpenSSL. Use Python 3.11+ for the release helper scripts.
 
 ```powershell
 cargo build --release --locked

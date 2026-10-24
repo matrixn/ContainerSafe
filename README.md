@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.10** · Next releases increment by **0.01** (0.11, 0.12, …).
+**Version 0.11** · Next releases increment by **0.01** (0.12, 0.13, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -90,7 +90,7 @@ Installer builds run only when a version tag (`v*`) is pushed. Ordinary commits 
 ### Prerequisites
 
 - **Rust and Cargo** (a toolchain compatible with Slint 1.18).
-- **Windows:** Visual Studio C++ Build Tools / MSVC, Windows SDK and native Windows Perl (for bundled OpenSSL). Put Strawberry Perl on PATH, or set `OPENSSL_SRC_PERL` to its `perl.exe`. The first build compiles OpenSSL and can take several minutes.
+- **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK. SSH uses native WinCNG; OpenSSL and Perl are not required. Private-key login requires an RSA key in traditional PEM format (encrypted keys are supported); Ed25519, ECDSA, PKCS#8 and modern OpenSSH key containers are unsupported by the locked WinCNG backend. See [SSH compatibility](docs/SERVER_MANAGEMENT.md#credentials-and-keys).
 - **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. Configure a server in the native app first. Connections pin the host key before authentication; Docker access is discovered using a restricted command list.
 - **For the standalone local Restic lab:** `restic` available on `PATH`.
 
