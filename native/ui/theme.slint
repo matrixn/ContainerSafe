@@ -53,7 +53,7 @@ export component ChoiceBox inherits Rectangle {
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: root.enabled ? pointer : default; clicked => { focus.focus(); root.open-popup(); } }
     popup := PopupWindow {
-        y: root.height + 3px; width: root.width; height: root.model.length * 36px + 8px;
+        y: root.model.length > 6 ? -self.height - 3px : root.height + 3px; width: root.width; height: root.model.length * 36px + 8px;
         Rectangle { background: white; border-radius: 7px; border-width: 1px; border-color: #b8cbd8;
             init => { popup-focus.focus(); }
             popup-focus := FocusScope { key-pressed(event) => {

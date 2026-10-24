@@ -30,6 +30,15 @@ impl From<String> for Failure {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnectionStage {
+    Connecting,
+    VerifyingHost,
+    Authenticating,
+    CheckingDocker,
+}
+type Progress = Arc<dyn Fn(ConnectionStage) + Send + Sync>;
+
 pub struct Connection {
     server: Server,
     session: client::Handle<PinnedHost>,
@@ -41,6 +50,7 @@ struct PinnedHost {
     endpoint: String,
     fingerprint: Option<String>,
     rejection: Arc<Mutex<Option<Failure>>>,
+    progress: Progress,
 }
 impl client::Handler for PinnedHost {
     type Error = russh::Error;
@@ -48,6 +58,7 @@ impl client::Handler for PinnedHost {
         &mut self,
         key: &PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
+        (self.progress)(ConnectionStage::VerifyingHost);
         // Pin the same SSH wire-format SHA256 fingerprint used by the old backend.
         // Certificates require a separate CA policy; never implicitly trust their key.
         if key.certificate().is_some() {
@@ -139,7 +150,18 @@ impl Connection {
         secret: &Secret,
         hosts: &std::collections::BTreeMap<String, String>,
     ) -> Result<Self, Failure> {
+        Self::open_with_progress(server, secret, hosts, |_| {})
+    }
+
+    pub fn open_with_progress(
+        server: &Server,
+        secret: &Secret,
+        hosts: &std::collections::BTreeMap<String, String>,
+        progress: impl Fn(ConnectionStage) + Send + Sync + 'static,
+    ) -> Result<Self, Failure> {
         server.validate()?;
+        let progress: Progress = Arc::new(progress);
+        progress(ConnectionStage::Connecting);
         let timeout = Duration::from_secs(server.timeout_seconds as u64);
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -152,6 +174,7 @@ impl Connection {
             fingerprint: hosts.get(&endpoint).cloned(),
             endpoint,
             rejection: rejection.clone(),
+            progress: progress.clone(),
         };
         let config = Arc::new(client::Config::default());
         let connected = runtime.block_on(async {
@@ -170,6 +193,7 @@ impl Connection {
                 return Err(Failure::Message("SSH: connection or handshake failed/timed out (check address, port and server algorithms)".into()));
             }
         };
+        progress(ConnectionStage::Authenticating);
         // The server key has been verified BEFORE key decryption or credentials.
         let authentication_error = || {
             Failure::Message("SSH: Connected\nHost identity: Verified\nAuthentication: Failed (check credentials, key format/passphrase and server authentication policy)".into())
@@ -220,6 +244,7 @@ impl Connection {
             runtime,
             docker_prefix: "docker",
         };
+        progress(ConnectionStage::CheckingDocker);
         let candidates: Vec<_> = match server.docker_access {
             DockerAccess::Direct => DIRECT.to_vec(),
             DockerAccess::Sudo => SUDO.to_vec(),

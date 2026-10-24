@@ -1038,6 +1038,11 @@ enum StartupEvent {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: Vec<_> = std::env::args().skip(1).collect();
+    if arguments.as_slice() == ["--loading-gallery"] {
+        let gallery = LoadingGallery::new()?;
+        slint::select_bundled_translation("ro")?;
+        return gallery.run().map_err(Into::into);
+    }
     // Explicit development-only visual fixture. Never read profiles or connect
     // to a server in preview mode; its configuration lives in a disposable dir.
     #[cfg(debug_assertions)]

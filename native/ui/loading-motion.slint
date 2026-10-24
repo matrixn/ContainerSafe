@@ -1,0 +1,104 @@
+export component LoadingMotion inherits Rectangle {
+    in property <int> kind;
+    background: transparent;
+    width: 140px; height: 76px;
+    private property <angle> phase: 360deg * animation-tick() / 2.4s;
+    if root.kind == 0 : Rectangle {
+        x: 44px; y: 12px; width: 52px; height: 52px;
+        border-radius: 26px; border-width: 1px; border-color: #e1edf1;
+        for i in 12 : Rectangle {
+            x: 22px + 25px * cos(root.phase - i * 12deg);
+            y: 22px + 25px * sin(root.phase - i * 12deg);
+            width: 8px - i * 0.35px; height: self.width; border-radius: self.width / 2;
+            background: #218a9e; opacity: 1 - i * 0.07;
+        }
+        Rectangle { x: 22px; y: 22px; width: 8px; height: 8px; border-radius: 4px; background: #d4e9ed; }
+    }
+    if root.kind == 1 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 3 : Rectangle {
+            private property <float> breath: (sin(root.phase - i * 32deg) + 1) / 2;
+            width: 26px + i * 13px + self.breath * 13px; height: self.width;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border-radius: self.width / 2; border-width: 1px; border-color: #74b5bc;
+            background: i == 0 ? #e0f1f2 : transparent; opacity: 0.75 - i * 0.18;
+        }
+        Rectangle { x: 65px; y: 33px; width: 10px; height: 10px; border-radius: 5px; background: #298c99; }
+    }
+    if root.kind == 2 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 7 : Rectangle {
+            private property <float> rise: (sin(root.phase * 1.4 - i * 30deg) + 1) / 2;
+            x: 27px + i * 13px; width: 6px; height: 10px + self.rise * 30px;
+            y: (parent.height - self.height) / 2; border-radius: 3px;
+            background: i < 3 ? #3c9eaa : #727cbb; opacity: 0.55 + self.rise * 0.45;
+        }
+    }
+    if root.kind == 3 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 4 : Rectangle {
+            private property <float> radius: 19 + 7 * sin(root.phase);
+            width: 10px; height: 10px; border-radius: 3px;
+            x: 65px + self.radius * 1px * cos(-root.phase / 2 + i * 90deg);
+            y: 33px + self.radius * 1px * sin(-root.phase / 2 + i * 90deg);
+            background: i < 2 ? #2e899d : #9298c6;
+        }
+        Rectangle { x: 67px; y: 35px; width: 6px; height: 6px; border-radius: 2px; background: #d6e6ed; }
+    }
+    if root.kind == 4 : Rectangle {
+        x: 10px; y: 35px; width: 120px; height: 5px; border-radius: 2.5px; background: #e6edf3;
+        clip: true;
+        Rectangle {
+            x: -50px + (parent.width + 50px) * mod(animation-tick(), 2s) / 2s;
+            width: 50px; height: parent.height; border-radius: 2.5px;
+            background: @linear-gradient(90deg, #e6edf3 0%, #46a6b0 50%, #e6edf3 100%);
+        }
+    }
+    if root.kind == 5 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 3 : Rectangle {
+            private property <float> ripple: mod(animation-tick() + i * 800ms, 2.4s) / 2.4s;
+            width: 12px + self.ripple * 58px; height: self.width;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border-radius: self.width / 2; border-width: 1.5px; border-color: #3296a6; opacity: 1 - self.ripple;
+        }
+    }
+    if root.kind == 6 : Rectangle {
+        width: 140px; height: 76px;
+        Rectangle { x: 28px; y: 54px; width: 84px; height: 1px; background: #e5edf1; }
+        for i in 3 : Rectangle {
+            x: 65px + 36px * sin(root.phase - i * 14deg);
+            y: 30px + 12px * cos(root.phase - i * 14deg);
+            width: 10px - i * 2px; height: self.width; border-radius: self.width / 2;
+            background: #4a97ab; opacity: 1 - i * 0.3;
+        }
+    }
+    if root.kind == 7 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 6 : Rectangle {
+            private property <float> breath: (sin(root.phase - i * 20deg) + 1) / 2;
+            width: 14px; height: 14px; border-radius: 7px;
+            x: 63px + (14px + self.breath * 8px) * cos(i * 60deg);
+            y: 31px + (14px + self.breath * 8px) * sin(i * 60deg);
+            background: i < 3 ? #64afb9 : #a4a3cf; opacity: 0.3 + self.breath * 0.55;
+        }
+    }
+    if root.kind == 8 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 9 : Rectangle {
+            private property <float> glow: (sin(root.phase - i * 35deg) + 1) / 2;
+            width: 10px; height: 10px; border-radius: 3px;
+            x: 49px + mod(i, 3) * 16px; y: 17px + floor(i / 3) * 16px;
+            background: #469aa9; opacity: 0.15 + self.glow * 0.85;
+        }
+    }
+    if root.kind == 9 : Rectangle {
+        width: 140px; height: 76px;
+        for i in 18 : Rectangle {
+            private property <angle> angle: root.phase - i * 8deg;
+            width: 7px - i * 0.2px; height: self.width; border-radius: self.width / 2;
+            x: 67px + 37px * cos(self.angle); y: 35px + 20px * sin(self.angle * 2);
+            background: i < 8 ? #448da7 : #9a96c7; opacity: 1 - i * 0.05;
+        }
+    }
+}

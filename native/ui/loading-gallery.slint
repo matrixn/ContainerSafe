@@ -1,0 +1,78 @@
+import { LoadingMotion } from "loading-motion.slint";
+import { SelectableText } from "selectable-text.slint";
+import { Theme, ActionButton } from "theme.slint";
+import { Palette } from "std-widgets.slint";
+
+component Sample inherits Rectangle {
+    in property <int> number;
+    in property <string> name;
+    in property <string> description;
+    in property <bool> selected;
+    callback choose;
+    background: white; border-radius: 14px; border-width: root.selected ? 2px : 1px;
+    border-color: root.selected ? Theme.accent : Theme.line;
+    VerticalLayout { padding: 22px; spacing: 12px;
+        HorizontalLayout { spacing: 10px;
+            Rectangle { width: 26px; height: 26px; border-radius: 8px; background: #e9f3f5;
+                Text { text: root.number; color: Theme.accent; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            SelectableText { text: root.name; font-size: 17px; font-weight: 650; text-color: Theme.ink; vertical-alignment: center; }
+        }
+        SelectableText { text: root.description; font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
+        Rectangle { vertical-stretch: 1;
+            LoadingMotion { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; kind: root.number - 1; }
+        }
+        SelectableText { text: @tr("Connecting securely…"); text-color: Theme.ink; font-size: 13px; horizontal-alignment: center; }
+        HorizontalLayout { alignment: center;
+            ActionButton { text: root.selected ? @tr("Selected") : @tr("Choose this animation"); primary: root.selected; clicked => { root.choose(); } }
+        }
+    }
+}
+export component LoadingGallery inherits Window {
+    title: @tr("ContainerSafe · Loading animation studio");
+    icon: @image-url("../assets/icons/containersafe.png");
+    preferred-width: 1160px; preferred-height: 820px; min-width: 1000px; min-height: 740px;
+    default-font-family: "Segoe UI"; background: Theme.canvas;
+    in-out property <int> selection: 2;
+    in-out property <bool> more: true;
+    init => { Palette.color-scheme = light; }
+    VerticalLayout { padding: 28px; spacing: 18px;
+        SelectableText { text: @tr("A quieter kind of progress"); font-size: 26px; font-weight: 700; text-color: Theme.ink; }
+        SelectableText { text: @tr("Ten live animations on two pages. Compare them here, then choose your loading animation in Settings."); wrap: word-wrap; text-color: Theme.muted; font-size: 13px; }
+        HorizontalLayout { spacing: 12px;
+            ActionButton { text: @tr("Animations 1–5"); primary: !root.more; clicked => { root.more = false; } }
+            ActionButton { text: @tr("Animations 6–10"); primary: root.more; clicked => { root.more = true; } }
+        }
+        if !root.more : HorizontalLayout { spacing: 16px; vertical-stretch: 1;
+            Sample { number: 1; name: @tr("Orbit"); description: @tr("A delicate trail glides around a fine circular track."); selected: root.selection == 1; choose => { root.selection = 1; } }
+            Sample { number: 2; name: @tr("Breath"); description: @tr("Soft concentric halos expand and settle at a calm pace."); selected: root.selection == 2; choose => { root.selection = 2; } }
+            Sample { number: 3; name: @tr("Silk wave"); description: @tr("Seven slender bars move in a smooth, flowing cadence."); selected: root.selection == 3; choose => { root.selection = 3; } }
+        }
+        if !root.more : HorizontalLayout { spacing: 16px; vertical-stretch: 1;
+            Sample { number: 4; name: @tr("Constellation"); description: @tr("Four rounded jewels orbit a quiet central point."); selected: root.selection == 4; choose => { root.selection = 4; } }
+            Sample { number: 5; name: @tr("Horizon"); description: @tr("A restrained shimmer travels along a slim horizontal line."); selected: root.selection == 5; choose => { root.selection = 5; } }
+            Rectangle { background: #eaf1f6; border-radius: 14px;
+                VerticalLayout { padding: 24px; spacing: 14px; alignment: center;
+                    SelectableText { text: root.selection == 0 ? @tr("Which one feels right?") : @tr("Your preview choice: ") + root.selection; text-color: Theme.ink; font-size: 19px; font-weight: 650; wrap: word-wrap; }
+                    SelectableText { text: @tr("Save your favorite in File → Settings → Loading animation. Breath is the default."); text-color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                }
+            }
+        }
+        if root.more : HorizontalLayout { spacing: 16px; vertical-stretch: 1;
+            Sample { number: 6; name: @tr("Ripple"); description: @tr("Fine rings expand and dissolve like ripples on still water."); selected: root.selection == 6; choose => { root.selection = 6; } }
+            Sample { number: 7; name: @tr("Pendulum"); description: @tr("A delicate point swings along a gentle curved path."); selected: root.selection == 7; choose => { root.selection = 7; } }
+            Sample { number: 8; name: @tr("Lotus"); description: @tr("Six soft petals open and close in a quiet rhythm."); selected: root.selection == 8; choose => { root.selection = 8; } }
+        }
+        if root.more : HorizontalLayout { spacing: 16px; vertical-stretch: 1;
+            Sample { number: 9; name: @tr("Cascade"); description: @tr("A small mosaic lights up in a flowing sequence."); selected: root.selection == 9; choose => { root.selection = 9; } }
+            Sample { number: 10; name: @tr("Infinity"); description: @tr("A fine luminous trail follows an endless figure eight."); selected: root.selection == 10; choose => { root.selection = 10; } }
+            Rectangle { background: #eaf1f6; border-radius: 14px;
+                VerticalLayout { padding: 24px; alignment: center; spacing: 14px;
+                    SelectableText { text: @tr("Your preview choice: ") + root.selection; text-color: Theme.ink; font-size: 19px; font-weight: 650; }
+                    SelectableText { text: @tr("Save your favorite in File → Settings → Loading animation. Breath is the default."); text-color: Theme.muted; wrap: word-wrap; }
+                }
+            }
+        }
+
+    }
+}

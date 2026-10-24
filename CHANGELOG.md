@@ -2,6 +2,23 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.21 — 2026-10-25
+
+- Add Ripple, Pendulum, Lotus, Cascade and Infinity, bringing the loading gallery to ten live options across two pages.
+- Share one animation component between gallery, Settings preview and actual connection popup. Add an autosaved Loading animation preference with Breath (option 2) as the default for new and existing settings files.
+- Validate all animation choices and preserve rollback on failed saves; keep connection stages, host checks and modal input blocking unchanged.
+
+## 0.20 — 2026-10-25
+
+- Add a standalone loading animation gallery (`--loading-gallery`) with five live native animations: Orbit, Breath, Silk wave, Constellation and Horizon.
+- Compare all options at once and highlight a preview choice without changing the connection popup or accessing server profiles.
+
+## 0.19 — 2026-10-25
+
+- Add a centered, borderless connection overlay with an indeterminate spinner and live SSH/host verification/authentication/Docker/discovery/planning stage text in English and Romanian.
+- Dim and block underlying workspace/forms while connecting. Close the overlay on success, failure or required host approval; preserve all identity checks and test revision guards.
+- Report actual SSH transport stages via an optional callback while preserving the existing Connection::open API.
+
 ## 0.18 — 2026-10-25
 
 - Show only plans with an enabled, supported Include or Logical dump selection; remove plans immediately when their last backup is disabled. Preserve canonical Review targets and database protections.

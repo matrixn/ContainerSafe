@@ -1,5 +1,7 @@
+import { LoadingMotion } from "loading-motion.slint";
 import { SelectableText } from "selectable-text.slint";
 import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton, ToggleCheck } from "theme.slint";
+export { LoadingGallery } from "loading-gallery.slint";
 export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
@@ -107,6 +109,8 @@ export component ContainerSafeWindow inherits Window {
     in-out property <int> form-docker;
     in-out property <string> form-timeout: "10";
     in-out property <string> connection-result: @tr("Not tested");
+    in-out property <int> loading-animation: 1;
+    in-out property <string> connection-step;
     in-out property <bool> test-busy;
     in-out property <bool> test-passed;
     in-out property <string> host-question;
@@ -128,19 +132,19 @@ export component ContainerSafeWindow inherits Window {
         Menu { title: @tr("File");
             MenuItem { title: @tr("New Server..."); shortcut: @keys(Control + N); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("new"); } }
             MenuItem { title: @tr("Servers..."); shortcut: @keys(Control + Shift + S); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("servers"); } }
-            MenuItem { title: @tr("Settings"); enabled: root.dialog == 0; activated => { root.page = 4; } }
+            MenuItem { title: @tr("Settings"); enabled: root.dialog == 0 && !root.test-busy; activated => { root.page = 4; } }
             MenuSeparator {}
             MenuItem { title: @tr("Quit"); shortcut: @keys(Control + Q); activated => { root.server-action("quit"); } }
         }
         Menu { title: @tr("Help");
-            MenuItem { title: @tr("Documentation"); activated => { root.server-action("docs"); } }
-            MenuItem { title: @tr("About ContainerSafe"); activated => { root.dialog = 4; } }
+            MenuItem { title: @tr("Documentation"); enabled: !root.test-busy; activated => { root.server-action("docs"); } }
+            MenuItem { title: @tr("About ContainerSafe"); enabled: !root.test-busy; activated => { root.dialog = 4; } }
         }
     }
 
     init => { Palette.color-scheme = light; }
-    FocusScope { key-pressed(event) => { if event.text == Key.Escape && root.dialog != 0 { root.server-action("cancel"); return accept; } return reject; }
-    FocusScope { enabled: root.dialog == 0;
+    FocusScope { key-pressed(event) => { if root.test-busy { return accept; } if event.text == Key.Escape && root.dialog != 0 { root.server-action("cancel"); return accept; } return reject; }
+    FocusScope { enabled: root.dialog == 0 && !root.test-busy;
     HorizontalLayout { spacing: 0px;
         Rectangle { width: 186px; background: #ffffff; border-width: 1px; border-color: #e1e8f0;
             VerticalLayout { padding: 14px; spacing: 8px;
@@ -182,8 +186,8 @@ export component ContainerSafeWindow inherits Window {
                 if root.settings-error != "" : SelectableText { text: root.settings-error; text-color: #a34431; wrap: word-wrap; }
                 ListView {
                     for setting[index] in root.preferences: Rectangle {
-                        height: 132px;
-                        Rectangle { y: 6px; height: 120px; width: parent.width; background: white; border-radius: 8px; border-width: 1px; border-color: Theme.line;
+                        height: index == 7 ? 160px : 132px;
+                        Rectangle { y: 6px; height: parent.height - 12px; width: parent.width; background: white; border-radius: 8px; border-width: 1px; border-color: Theme.line;
                         HorizontalLayout { padding: 18px; spacing: 24px;
                             VerticalLayout { spacing: 5px; horizontal-stretch: 1;
                                 SelectableText { text: setting.title; font-size: 14px; font-weight: 650; text-color: Theme.ink; }
@@ -191,6 +195,7 @@ export component ContainerSafeWindow inherits Window {
                                 SelectableText { text: setting.state == 1 ? @tr("Saved automatically") : setting.state == 2 ? @tr("Could not save. Your previous setting is still active.") : ""; text-color: setting.state == 2 ? #a34431 : #39765c; font-size: 11px; }
                             }
                             VerticalLayout { alignment: center; width: 260px;
+                                if index == 7 : HorizontalLayout { alignment: center; LoadingMotion { kind: setting.choice; } }
                                 if index != 6 : ComboBox { model: setting.options; current-index: setting.choice; enabled: root.settings-editable; selected(value) => { root.preference-changed(index, self.current-index); } }
                                 if index == 6 : ToggleCheck { text: setting.choice == 1 ? @tr("On") : @tr("Off"); checked: setting.choice == 1; enabled: root.settings-editable; toggled => { root.preference-changed(index, self.checked ? 1 : 0); } }
                             }
@@ -391,4 +396,24 @@ export component ContainerSafeWindow inherits Window {
     }
 
     }
+    if root.test-busy : Rectangle {
+        background: #14233899;
+        forward-focus: loading-focus;
+        init => { loading-focus.focus(); }
+        TouchArea { mouse-cursor: wait; }
+        loading-focus := FocusScope {
+        width: parent.width; height: parent.height;
+        key-pressed(event) => { return accept; }
+        Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: 380px; height: 196px; background: white;
+            border-radius: 14px; border-width: 1px; border-color: Theme.line;
+            VerticalLayout { padding: 28px; spacing: 20px; alignment: center;
+                HorizontalLayout { alignment: center; LoadingMotion { kind: root.loading-animation; } }
+                SelectableText { text: root.connection-step; text-color: Theme.ink; font-size: 15px; font-weight: 600; horizontal-alignment: center; wrap: word-wrap; }
+            }
+        }
+        }
+    }
+
 }

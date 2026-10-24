@@ -1,6 +1,6 @@
 use super::*;
 use containersafe::servers::{
-    connection::{Connection, Failure, HostIdentity},
+    connection::{Connection, ConnectionStage, Failure, HostIdentity},
     credentials,
     model::{now, Authentication, DockerAccess, TestGate},
     storage::Profiles,
@@ -116,10 +116,22 @@ fn probe(
     server: Server,
     secret: Secret,
     hosts: std::collections::BTreeMap<String, String>,
+    progress: impl Fn(&'static str) + Send + Sync + 'static,
 ) -> Result<Tested, Failure> {
-    let connection = Connection::open(&server, &secret, &hosts)?;
+    let progress = Arc::new(progress);
+    let ssh_progress = progress.clone();
+    let connection = Connection::open_with_progress(&server, &secret, &hosts, move |stage| {
+        ssh_progress(match stage {
+            ConnectionStage::Connecting => "Connecting to SSH…",
+            ConnectionStage::VerifyingHost => "Verifying server identity…",
+            ConnectionStage::Authenticating => "Authenticating securely…",
+            ConnectionStage::CheckingDocker => "Checking Docker access…",
+        });
+    })?;
     let version = connection.docker("version --format '{{.Server.Version}}'")?;
+    progress("Discovering containers…");
     let containers = containersafe::discover(&connection)?;
+    progress("Preparing backup plans…");
     let report = serde_json::from_value(
         serde_json::to_value(containersafe::plan::build(&containers))
             .map_err(|_| "Cannot build plan".to_string())?,
@@ -232,6 +244,7 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
         (server, secret, c.profiles.hosts.clone(), c.gate.revision)
     };
     ui.set_test_passed(false);
+    ui.set_connection_step(i18n::text("Connecting to SSH…").into());
     ui.set_test_busy(true);
     ui.set_connection_result(
         "Connecting to SSH; checking identity, authentication and Docker...".into(),
@@ -246,7 +259,17 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
     let state = state.clone();
     let root = root.to_path_buf();
     std::thread::spawn(move || {
-        let result = probe(server, secret, hosts);
+        let progress_ui = Arc::new(Mutex::new(weak.clone()));
+        let progress_control = control.clone();
+        let result = probe(server, secret, hosts, move |step| {
+            let weak = progress_ui.lock().unwrap().clone();
+            let control = progress_control.clone();
+            let _ = weak.upgrade_in_event_loop(move |ui| {
+                if ui.get_test_busy() && control.lock().unwrap().gate.revision == revision {
+                    ui.set_connection_step(i18n::text(step).into());
+                }
+            });
+        });
         let _ = weak.upgrade_in_event_loop(move |ui| {
             let mut c = control.lock().unwrap();
             if c.gate.revision != revision { return; }
@@ -350,6 +373,9 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
         let state = state.clone();
         ui.on_form_edited(move || {
             if let Some(ui) = weak.upgrade() {
+                if ui.get_test_busy() {
+                    return;
+                }
                 let mut c = control.lock().unwrap();
                 c.gate.invalidate();
                 c.tested = None;
@@ -529,6 +555,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                     #[cfg(target_os="macos")] let _=std::process::Command::new("open").arg("https://github.com/matrixn/ContainerSafe#readme").spawn();
                 }); return;
             }
+            if ui.get_test_busy() { return; }
             let mut c=control.lock().unwrap();
             if action=="cancel" {
                 c.gate.invalidate(); c.tested=None; c.pending_host=None; c.opening=false;

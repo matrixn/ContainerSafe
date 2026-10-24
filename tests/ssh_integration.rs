@@ -1,5 +1,5 @@
 use containersafe::servers::{
-    connection::{Connection, Failure},
+    connection::{Connection, ConnectionStage, Failure},
     credentials::Secret,
     model::{Authentication, DockerAccess, Server},
 };
@@ -77,7 +77,16 @@ impl Fixture {
 fn real_password_key_authentication_host_identity_and_docker_checks() {
     let mut f = Fixture::new();
     let password = Secret("fixture-password".into());
-    let initial = Connection::open(&f.server, &password, &BTreeMap::new());
+    let stages = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let observed = stages.clone();
+    let initial =
+        Connection::open_with_progress(&f.server, &password, &BTreeMap::new(), move |stage| {
+            observed.lock().unwrap().push(stage)
+        });
+    assert_eq!(
+        *stages.lock().unwrap(),
+        [ConnectionStage::Connecting, ConnectionStage::VerifyingHost]
+    );
     assert!(
         matches!(&initial, Err(Failure::UnknownHost(_))),
         "Unexpected SSH result: {:?}\n{}",
@@ -99,8 +108,21 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
     assert!(
         matches!(Connection::open(&f.server,&Secret("wrong".into()),&f.hosts),Err(Failure::Message(m)) if m.contains("Authentication: Failed"))
     );
-    let connection = Connection::open(&f.server, &password, &f.hosts)
-        .unwrap_or_else(|_| panic!("Password SSH should succeed"));
+    stages.lock().unwrap().clear();
+    let observed = stages.clone();
+    let connection = Connection::open_with_progress(&f.server, &password, &f.hosts, move |stage| {
+        observed.lock().unwrap().push(stage)
+    })
+    .unwrap_or_else(|_| panic!("Password SSH should succeed"));
+    assert_eq!(
+        *stages.lock().unwrap(),
+        [
+            ConnectionStage::Connecting,
+            ConnectionStage::VerifyingHost,
+            ConnectionStage::Authenticating,
+            ConnectionStage::CheckingDocker
+        ]
+    );
     assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
     f.server.username = "denied".into();
     let denied = Connection::open(&f.server, &password, &f.hosts)

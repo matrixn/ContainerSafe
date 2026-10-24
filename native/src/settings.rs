@@ -12,6 +12,7 @@ pub(super) struct Preferences {
     ssh_port: usize,
     timeout: usize,
     docker: usize,
+    loading_animation: usize,
     auto_connect_last_server: usize,
     #[serde(default, skip_serializing)]
     auto_connect: Option<usize>,
@@ -26,17 +27,18 @@ impl Default for Preferences {
             ssh_port: 0,
             timeout: 0,
             docker: 0,
+            loading_animation: 1,
             auto_connect_last_server: 0,
             auto_connect: None,
         }
     }
 }
-const COUNTS: [usize; 7] = [2, 2, 3, 3, 4, 3, 2];
+const COUNTS: [usize; 8] = [2, 2, 3, 3, 4, 3, 2, 10];
 impl Preferences {
     pub(super) fn language(&self) -> usize {
         self.language
     }
-    fn choices(&self) -> [usize; 7] {
+    fn choices(&self) -> [usize; 8] {
         [
             self.language,
             self.start_page,
@@ -45,9 +47,10 @@ impl Preferences {
             self.timeout,
             self.docker,
             self.auto_connect_last_server,
+            self.loading_animation,
         ]
     }
-    fn from_choices(values: [usize; 7]) -> Result<Self, String> {
+    fn from_choices(values: [usize; 8]) -> Result<Self, String> {
         if values.iter().zip(COUNTS).any(|(v, count)| *v >= count) {
             return Err("Invalid preference value".into());
         }
@@ -60,6 +63,7 @@ impl Preferences {
             timeout: values[4],
             docker: values[5],
             auto_connect_last_server: values[6],
+            loading_animation: values[7],
             auto_connect: None,
         })
     }
@@ -81,8 +85,8 @@ impl Preferences {
         storage::atomic_write(&root.join("settings.json"), &data)
     }
 }
-fn rows(value: &Preferences, states: &[i32; 7]) -> ModelRc<PreferenceEntry> {
-    let specs: [(&str, &str, &[&str]); 7] = [
+fn rows(value: &Preferences, states: &[i32; 8]) -> ModelRc<PreferenceEntry> {
+    let specs: [(&str, &str, &[&str]); 8] = [
         ("Language", "Choose the interface language. Changes apply immediately.", &["English", "Română"]),
         ("Start page", "Choose the workspace shown when ContainerSafe starts.", &["Containers", "Backup plans"]),
         ("Initial source filter", "Start with all sources, storage only, or databases only. You can change the filter in Containers.", &["All sources", "Storage", "Databases"]),
@@ -90,6 +94,7 @@ fn rows(value: &Preferences, states: &[i32; 7]) -> ModelRc<PreferenceEntry> {
         ("Default connection timeout", "Maximum wait for SSH network operations on new profiles. Existing profiles are unchanged.", &["10 seconds", "30 seconds", "60 seconds", "120 seconds"]),
         ("Default Docker access", "Automatic tries direct Docker, then passwordless sudo. Direct uses the SSH account. Sudo requires existing passwordless permissions.", &["Automatic (recommended)", "Direct Docker CLI", "Passwordless sudo -n"]),
         ("Reconnect to last server", "Off by default: show your saved servers at startup, or Add server if none exist. On: reconnect to the last successfully opened server. Host identity is always checked.", &["Off", "On"]),
+        ("Loading animation", "Choose the animation used while connecting. Preview updates immediately; Breath is the default. Your choice is saved automatically.", &["1 · Orbit", "2 · Breath", "3 · Silk wave", "4 · Constellation", "5 · Horizon", "6 · Ripple", "7 · Pendulum", "8 · Lotus", "9 · Cascade", "10 · Infinity"]),
     ];
     ModelRc::new(VecModel::from(
         specs
@@ -140,19 +145,20 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         .expect("English and Romanian are bundled");
     ui.set_page(initial.start_page as i32);
     ui.set_entry_kind(initial.source_filter as i32);
-    ui.set_preferences(rows(&initial, &[0; 7]));
+    ui.set_preferences(rows(&initial, &[0; 8]));
+    ui.set_loading_animation(initial.loading_animation as i32);
     ui.set_settings_editable(editable);
     if let Err(e) = loaded {
         ui.set_settings_error(format!("{} {e}", crate::i18n::text("Settings could not be loaded. The original file is preserved; editing is disabled.")).into());
     }
     let current = Rc::new(RefCell::new(initial));
-    let saved = Rc::new(RefCell::new([0; 7]));
+    let saved = Rc::new(RefCell::new([0; 8]));
     let weak = ui.as_weak();
     ui.on_preference_changed(move |index, value| {
         let Some(ui) = weak.upgrade() else {
             return;
         };
-        if !editable || index < 0 || index as usize >= 7 || value < 0 {
+        if !editable || index < 0 || index as usize >= 8 || value < 0 {
             return;
         }
         let index = index as usize;
@@ -192,6 +198,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                 );
             }
         }
+        ui.set_loading_animation(current.borrow().loading_animation as i32);
         ui.set_preferences(rows(&current.borrow(), &saved.borrow()));
         if let Ok(state) = state.lock() {
             render(&ui, &state);
@@ -206,7 +213,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let defaults = Preferences::load(dir.path()).unwrap();
         assert_eq!(defaults, Preferences::default());
-        let changed = Preferences::from_choices([1, 1, 2, 1, 3, 2, 0]).unwrap();
+        let changed = Preferences::from_choices([1, 1, 2, 1, 3, 2, 0, 9]).unwrap();
         changed.save(dir.path()).unwrap();
         assert_eq!(Preferences::load(dir.path()).unwrap(), changed);
     }
@@ -238,6 +245,28 @@ mod tests {
                 content
             );
         }
+    }
+    #[test]
+    fn animation_defaults_migration_and_validation() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(Preferences::load(dir.path()).unwrap().loading_animation, 1);
+        fs::write(dir.path().join("settings.json"), r#"{"language":1}"#).unwrap();
+        assert_eq!(Preferences::load(dir.path()).unwrap().loading_animation, 1);
+        for animation in 0..10 {
+            let mut value = Preferences::default();
+            value.loading_animation = animation;
+            value.save(dir.path()).unwrap();
+            assert_eq!(
+                Preferences::load(dir.path()).unwrap().loading_animation,
+                animation
+            );
+        }
+        fs::write(
+            dir.path().join("settings.json"),
+            r#"{"loading_animation":10}"#,
+        )
+        .unwrap();
+        assert!(Preferences::load(dir.path()).is_err());
     }
     #[test]
     fn saving_failure_is_reported() {

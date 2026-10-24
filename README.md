@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.18** · Next releases increment by **0.01** (0.19, 0.20, …).
+**Version 0.21** · Next releases increment by **0.01** (0.22, 0.23, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -229,3 +229,9 @@ Preferences live in `settings.json` beside `servers.json`, contain no secrets, a
 To add or maintain Romanian translations, edit `native/translations/ro.json`, then run `python scripts/update-translations.py` (or `--check` to verify the bundled gettext catalog). Translations are built into the application; no gettext runtime or download is required.
 
 Backup plans lists only stacks/containers with at least one enabled, supported Include or Logical dump selection. Disabling the last active selection removes the plan immediately, before saving; Exclude and No backup do not activate a plan.
+
+Connecting or testing a server shows a small modal loading card, without a separate title bar or buttons. An animated spinner and the actual connection stage remain visible over the dimmed workspace. Unknown/changed host keys return to the existing explicit identity approval dialog.
+
+Launch `containersafe-native --loading-gallery` to compare ten native loading animations across two pages. Selecting a card only highlights your preview choice and does not change connection settings or access servers.
+
+Choose **File → Settings → Loading animation** to preview and automatically save any of the ten options. Breath (option 2) is the default, including when upgrading an existing settings file. The same animation is used in the actual connection popup.

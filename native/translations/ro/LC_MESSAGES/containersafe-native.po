@@ -772,3 +772,156 @@ msgstr "Reconectare la ultimul server"
 msgid "Off by default: show your saved servers at startup, or Add server if none exist. On: reconnect to the last successfully opened server. Host identity is always checked."
 msgstr "Dezactivat implicit: afișează serverele salvate la pornire sau formularul de adăugare dacă lista este goală. Activat: reconectează ultimul server deschis cu succes. Identitatea serverului este verificată întotdeauna."
 
+msgid "Connecting to SSH…"
+msgstr "Se conectează la SSH…"
+
+msgid "Verifying server identity…"
+msgstr "Se verifică identitatea serverului…"
+
+msgid "Authenticating securely…"
+msgstr "Autentificare securizată…"
+
+msgid "Checking Docker access…"
+msgstr "Se verifică accesul Docker…"
+
+msgid "Discovering containers…"
+msgstr "Se descoperă containerele…"
+
+msgid "Preparing backup plans…"
+msgstr "Se pregătesc planurile de backup…"
+
+msgid "Connecting securely…"
+msgstr "Se stabilește conexiunea securizată…"
+
+msgid "Selected"
+msgstr "Selectată"
+
+msgid "Choose this animation"
+msgstr "Alege animația"
+
+msgid "ContainerSafe · Loading animation studio"
+msgstr "ContainerSafe · Studio de animații"
+
+msgid "A quieter kind of progress"
+msgstr "Progres cu eleganță"
+
+msgid "Five live animations. Compare their rhythm, then choose your favorite. This preview does not connect to any server."
+msgstr "Cinci animații în timp real. Compară ritmul și alege favorita. Această fereastră nu se conectează la niciun server."
+
+msgid "Orbit"
+msgstr "Orbită"
+
+msgid "Breath"
+msgstr "Respirație"
+
+msgid "Silk wave"
+msgstr "Val de mătase"
+
+msgid "Constellation"
+msgstr "Constelație"
+
+msgid "Horizon"
+msgstr "Orizont"
+
+msgid "A delicate trail glides around a fine circular track."
+msgstr "O urmă fină alunecă de-a lungul unui cerc discret."
+
+msgid "Soft concentric halos expand and settle at a calm pace."
+msgstr "Halouri concentrice se dilată și se retrag într-un ritm calm."
+
+msgid "Seven slender bars move in a smooth, flowing cadence."
+msgstr "Șapte linii fine se unduiesc într-o mișcare fluidă."
+
+msgid "Four rounded jewels orbit a quiet central point."
+msgstr "Patru forme delicate orbitează în jurul unui punct central."
+
+msgid "A restrained shimmer travels along a slim horizontal line."
+msgstr "O lumină discretă parcurge o linie orizontală fină."
+
+msgid "Which one feels right?"
+msgstr "Care ți se potrivește?"
+
+msgid "Your preview choice: "
+msgstr "Alegerea ta în test: "
+
+msgid "Tell me its number in the chat. The connection popup will keep its current animation until you decide."
+msgstr "Spune-mi numărul în chat. Popup-ul de conectare păstrează animația actuală până când alegi."
+
+msgid "Ten live animations on two pages. Compare them here, then choose your loading animation in Settings."
+msgstr "Zece animații pe două pagini. Compară-le aici, apoi alege animația de încărcare din Setări."
+
+msgid "Animations 1–5"
+msgstr "Animațiile 1–5"
+
+msgid "Animations 6–10"
+msgstr "Animațiile 6–10"
+
+msgid "Ripple"
+msgstr "Unde"
+
+msgid "Pendulum"
+msgstr "Pendul"
+
+msgid "Lotus"
+msgstr "Lotus"
+
+msgid "Cascade"
+msgstr "Cascadă"
+
+msgid "Infinity"
+msgstr "Infinit"
+
+msgid "Fine rings expand and dissolve like ripples on still water."
+msgstr "Inele fine se extind și se estompează ca undele pe apă."
+
+msgid "A delicate point swings along a gentle curved path."
+msgstr "Un punct delicat oscilează de-a lungul unei curbe line."
+
+msgid "Six soft petals open and close in a quiet rhythm."
+msgstr "Șase petale discrete se deschid și se închid într-un ritm calm."
+
+msgid "A small mosaic lights up in a flowing sequence."
+msgstr "Un mic mozaic se luminează într-o succesiune fluidă."
+
+msgid "A fine luminous trail follows an endless figure eight."
+msgstr "O urmă luminoasă fină desenează simbolul infinitului."
+
+msgid "Save your favorite in File → Settings → Loading animation. Breath is the default."
+msgstr "Salvează favorita în Fișier → Setări → Animație de încărcare. Respirație este varianta implicită."
+
+msgid "Loading animation"
+msgstr "Animație de încărcare"
+
+msgid "Choose the animation used while connecting. Preview updates immediately; Breath is the default. Your choice is saved automatically."
+msgstr "Alege animația afișată la conectare. Previzualizarea se actualizează imediat; Respirație este varianta implicită. Alegerea se salvează automat."
+
+msgid "1 · Orbit"
+msgstr "1 · Orbită"
+
+msgid "2 · Breath"
+msgstr "2 · Respirație"
+
+msgid "3 · Silk wave"
+msgstr "3 · Val de mătase"
+
+msgid "4 · Constellation"
+msgstr "4 · Constelație"
+
+msgid "5 · Horizon"
+msgstr "5 · Orizont"
+
+msgid "6 · Ripple"
+msgstr "6 · Unde"
+
+msgid "7 · Pendulum"
+msgstr "7 · Pendul"
+
+msgid "8 · Lotus"
+msgstr "8 · Lotus"
+
+msgid "9 · Cascade"
+msgstr "9 · Cascadă"
+
+msgid "10 · Infinity"
+msgstr "10 · Infinit"
+
