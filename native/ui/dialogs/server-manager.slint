@@ -6,6 +6,8 @@ export component ServerManager inherits Rectangle {
     in property <[ServerRow]> servers;
     in-out property <int> selected: -1;
     callback action(string);
+    in-out property <int> copied-host: -1;
+    changed servers => { root.copied-host = -1; }
     background: #ffffff;
     border-radius: 8px;
     VerticalLayout {
@@ -14,18 +16,30 @@ export component ServerManager inherits Rectangle {
         SelectableText { text: @tr("Servers"); font-size: 22px; font-weight: 700; text-color: #192b42; }
         HorizontalLayout {
             SelectableText { text-color: #253b52; text: @tr("Name"); width: 190px; }
-            SelectableText { text-color: #253b52; text: @tr("Host"); width: 200px; }
+            SelectableText { text-color: #253b52; text: @tr("Host"); width: 280px; }
             SelectableText { text-color: #253b52; text: @tr("Status"); width: 120px; }
             SelectableText { text-color: #253b52; text: @tr("Last opened"); }
         }
         ListView {
             for server[i] in root.servers: Rectangle {
-                height: 44px;
+                height: 56px;
                 background: root.selected == i ? #e1f1f5 : (Math.mod(i,2) == 0 ? #f6f9fc : #ffffff);
+                accessible-role: button; accessible-label: server.name + " " + server.host;
+                accessible-action-default => { root.selected = i; }
+                forward-focus: row-focus;
+                row-focus := FocusScope { key-pressed(event) => {
+                    if event.text == Key.Return || event.text == " " { root.selected = i; return accept; }
+                    return reject;
+                } }
+                TouchArea { mouse-cursor: default; clicked => { row-focus.focus(); root.selected = i; } }
                 HorizontalLayout {
                     padding: 8px;
-                    SelectableText { width: 182px; text: (server.default-server ? "★ " : "") + server.name; vertical-alignment: center; activated => { root.selected = i; } }
-                    SelectableText { text-color: #253b52; text: server.host; width: 200px; overflow: elide; vertical-alignment: center; }
+                    SelectableText { width: 182px; text: (server.default-server ? "★ " : "") + server.name; vertical-alignment: center;  }
+                    HorizontalLayout { width: 280px; spacing: 8px;
+                        SelectableText { text: server.host; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
+                        Button { text: root.copied-host == i ? @tr("Copied") : @tr("Copy host"); clicked => { host-value.copy-all(); root.copied-host = i; } }
+                        host-value := SelectableText { visible: false; text: server.host; }
+                    }
                     SelectableText { text-color: #253b52; text: server.status; width: 120px; vertical-alignment: center; }
                     SelectableText { text-color: #253b52; text: server.last-opened; vertical-alignment: center; }
                 }

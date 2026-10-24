@@ -2,6 +2,18 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.23 — 2026-10-25
+
+- Fix splash centering by waiting for the first native redraw event. Previously the positioning call ran before the event loop created the native window and did nothing.
+- Preserve physical monitor coordinates, DPI-aware window dimensions, the borderless half-size splash and the completed-loading delay.
+
+## 0.22 — 2026-10-25
+
+- Make ordinary interface text nonselectable, retaining selectable error output and explicit copy actions. Keep editable inputs normal.
+- Add a host-and-port copy button per server and row-wide selection with a normal cursor.
+- Organize preferences into Appearance & language, Startup & workspace, and New server defaults cards while preserving automatic saves and live animation preview.
+- Reduce splash size to 550 × 353, remove native decorations and center it on its monitor using physical monitor coordinates. Retain the completed-loading delay.
+
 ## 0.21 — 2026-10-25
 
 - Add Ripple, Pendulum, Lotus, Cascade and Infinity, bringing the loading gallery to ten live options across two pages.

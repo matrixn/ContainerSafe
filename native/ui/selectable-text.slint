@@ -1,6 +1,6 @@
-// A display label with the same layout metrics as Text and a read-only
-// selection layer. Focus reveals the full value, including elided content.
+// Display labels are not selectable. Enable selection explicitly for error output.
 export component SelectableText inherits Rectangle {
+    in property <bool> selectable: false;
     in property <string> text;
     in property <brush> text-color: #253b52;
     in property <length> font-size: 0px;
@@ -20,8 +20,8 @@ export component SelectableText inherits Rectangle {
     VerticalLayout {
         padding: 0px;
         Text {
-            accessible-role: none;
-            visible: !selection.has-focus;
+            accessible-role: AccessibleRole.text;
+            visible: !root.selectable || !selection.has-focus;
             text: root.text; color: root.text-color;
             font-size: root.font-size; font-weight: root.font-weight; font-family: root.font-family;
             wrap: root.wrap; overflow: root.overflow;
@@ -29,6 +29,8 @@ export component SelectableText inherits Rectangle {
         }
     }
     selection := TextInput {
+        visible: root.selectable;
+        enabled: root.selectable;
         width: parent.width; height: parent.height;
         text: root.text;
         read-only: true; single-line: false;

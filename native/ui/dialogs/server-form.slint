@@ -77,6 +77,7 @@ export component ServerForm inherits Rectangle {
     in-out property <bool> remember;
     in-out property <int> docker-access: 0;
     in-out property <string> timeout: "10";
+    in property <bool> result-error: false;
     in property <string> result;
     in property <bool> busy;
     in property <bool> tested;
@@ -188,8 +189,8 @@ export component ServerForm inherits Rectangle {
                         background: root.tested ? #e8f5ed : #f0f5fa; border-radius: 8px;
                         VerticalLayout { padding: 16px; spacing: 8px;
                             FieldLabel { label: root.tested ? @tr("Connection verified") : @tr("Connection check"); help: @tr("Test checks SSH connectivity, server identity, authentication and Docker access, then reads the container inventory. Save becomes available only after a successful test. Changing a field requires a new test. This does not run a backup."); }
-                            report := SelectableText { text: root.result; wrap: word-wrap; text-color: root.tested ? #286b4c : #526e83; font-size: 12px; }
-                            Button { text: @tr("Copy report"); clicked => { report.copy-all(); } }
+                            report := SelectableText { selectable: root.result-error; text: root.result; wrap: word-wrap; text-color: root.tested ? #286b4c : #526e83; font-size: 12px; }
+                            Button { visible: root.result-error; text: @tr("Copy report"); clicked => { report.copy-all(); } }
                         }
                     }
                 }

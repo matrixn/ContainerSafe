@@ -4,7 +4,7 @@ Actualizare **0.16**: Backup plans afișează numai proiectele/containerele pent
 
 `No backup` înlocuiește eticheta Pending și înseamnă că metoda nu a fost aleasă încă; decizia necesită în continuare revizuire pentru validare. `Exclude` este alegerea explicită de a omite elementul. Valoarea salvată rămâne `pending`, deci selecțiile existente nu necesită migrare.
 
-Fiecare selector are un **i încercuit**: ține mouse-ul deasupra pentru explicația opțiunilor efectiv disponibile sau apasă pentru ajutor selectabil/copiabil. Bazele de date fără metodă au suplimentar o iconiță informativă de avertizare lângă nume. Aceasta explică adapterul lipsă și motivul interdicției de a copia fișierele bazei active. PostgreSQL oferă în continuare doar planificarea unui dump; executarea adapterului nu este implementată încă.
+Fiecare selector are un **i încercuit**: ține mouse-ul deasupra pentru explicația opțiunilor efectiv disponibile sau apasă pentru explicații detaliate. Bazele de date fără metodă au suplimentar o iconiță informativă de avertizare lângă nume. Aceasta explică adapterul lipsă și motivul interdicției de a copia fișierele bazei active. PostgreSQL oferă în continuare doar planificarea unui dump; executarea adapterului nu este implementată încă.
 
 Interfața folosește alb și griuri deschise, text albastru închis și accente teal pentru acțiuni. Logo-ul real apare în stânga numelui aplicației. Butoanele, listele de selecție, checkboxurile și arborele au cursor de apăsare și feedback vizual; controalele dezactivate rămân distincte.
 
@@ -23,12 +23,12 @@ Raportul existent descrie stocarea la nivel de proiect Compose. Selectarea unui 
 cargo run --locked --manifest-path native/Cargo.toml
 ```
 
-1. Verifică versiunea **0.16**, logo-ul și tema deschisă. Conectează serverul existent prin fluxul normal; portul și verificarea SSH nu se schimbă.
+1. Verifică versiunea **0.22**, logo-ul și tema deschisă. Conectează serverul existent prin fluxul normal; portul și verificarea SSH nu se schimbă.
 2. Extinde un proiect Compose și selectează un container din el. Verifică numele, descrierea domeniului comun și sursele din dreapta. Restrânge separat Compose și Standalone.
 3. Caută numele unui container; proiectul părinte trebuie să rămână vizibil. Golește căutarea pentru a reveni la arbore.
 4. Folosește **Storage** și **Databases**. Verifică `No backup` și explicațiile iconițelor de lângă selectoare. Un PostgreSQL permite `Logical dump`, în timp ce directorul său brut nu oferă `Include`. Redis fără adapter selectabil permite numai No backup/Exclude și are o iconiță care explică limitarea.
-5. Deschide **Backup plans**: apar numai proiectele/containerele cu o metodă selectabilă; numerele reflectă lista filtrată. Ele rămân vizibile și dacă ai ales No backup sau Exclude, deoarece eligibilitatea depinde de metoda disponibilă, nu de alegerea curentă. **Review** revine la proiectul corect. Revizuiește alegerile, apoi salvează și validează prin acțiunile existente.
-6. Verifică hover-ul, cursorul și starea butoanelor activate/dezactivate. Detaliile pot fi selectate și copiate cu Ctrl+C; etichetele scurtate își păstrează valoarea completă la focalizare. Arborele copiază numele rândului focalizat cu Ctrl+C.
+5. Deschide **Backup plans**: apar numai proiectele/containerele cu Include sau Logical dump activat; dezactivarea ultimei metode elimină imediat planul. **Review** revine la proiectul corect. Revizuiește alegerile, apoi salvează și validează prin acțiunile existente.
+6. Verifică hover-ul, cursorul și starea butoanelor activate/dezactivate. Textele obișnuite nu se selectează. Erorile rămân selectabile și copiabile. În lista serverelor, Copiază adresa copiază hostul împreună cu portul.
 
 Schimbarea unei selecții marchează planul nesalvat. Validarea nu autorizează executarea unui backup de producție. Ferestrele serverelor păstrează validarea câmpurilor, tooltipurile și confirmarea explicită a fingerprintului SSH.
 
@@ -50,3 +50,5 @@ cargo clippy --locked --manifest-path native/Cargo.toml -- -D warnings
 ```
 
 Testele verifică ierarhia, expandarea/căutarea, păstrarea indicilor originali după sortare, numărarea selecțiilor după identitate și opțiunile permise de politica surselor. Inspecția vizuală se face separat în aplicația compilată.
+
+În Setări, verifică cele trei carduri de grup și salvarea automată sub setarea modificată. La pornire, splashscreen-ul are 550 × 353, fără titlu/butoane, și se centrează pe monitor; păstrează întârzierea de 2,5 secunde după încărcare.

@@ -305,5 +305,13 @@
   "7 · Pendulum": "7 · Pendul",
   "8 · Lotus": "8 · Lotus",
   "9 · Cascade": "9 · Cascadă",
-  "10 · Infinity": "10 · Infinit"
+  "10 · Infinity": "10 · Infinit",
+  "Copy host": "Copiază adresa",
+  "Copied": "Copiat",
+  "Appearance & language": "Aspect și limbă",
+  "Personalize the interface and connection animation.": "Personalizează interfața și animația de conectare.",
+  "Startup & workspace": "Pornire și spațiu de lucru",
+  "Choose what opens and which sources are shown when you start.": "Alege pagina de pornire și sursele afișate inițial.",
+  "New server defaults": "Valori implicite pentru servere noi",
+  "Starting values for new profiles. Existing servers keep their configuration.": "Valori inițiale pentru profilurile noi. Serverele existente își păstrează configurația."
 }

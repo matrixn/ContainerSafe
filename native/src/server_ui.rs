@@ -74,6 +74,7 @@ fn populate(ui: &ContainerSafeWindow, c: &mut Controller, server: Server, secret
         DockerAccess::Sudo => 2,
     });
     ui.set_form_timeout(server.timeout_seconds.to_string().into());
+    ui.set_connection_error(false);
     ui.set_test_passed(false);
     ui.set_test_busy(false);
     ui.set_connection_result(crate::i18n::text("Not tested").into());
@@ -188,12 +189,14 @@ fn activate(
     s.dirty = true;
     render(ui, &s);
     ui.set_active_server(format!("{} · {}", tested.server.name, tested.server.host).into());
-    ui.set_status_message(
+    set_status_message(
+        ui,
         i18n::format(
             "Connected to {0} · save reconciled backup selections",
             &[&tested.server.name],
         )
         .into(),
+        false,
     );
     ui.set_validation_message(crate::i18n::text("Plan changed; validation required").into());
     ui.set_dialog(0);
@@ -234,6 +237,7 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
         let (server, secret) = match form(ui, &c) {
             Ok(v) => v,
             Err(e) => {
+                ui.set_connection_error(true);
                 ui.set_connection_result(e.into());
                 return;
             }
@@ -243,6 +247,7 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
         c.pending_host = None;
         (server, secret, c.profiles.hosts.clone(), c.gate.revision)
     };
+    ui.set_connection_error(false);
     ui.set_test_passed(false);
     ui.set_connection_step(i18n::text("Connecting to SSH…").into());
     ui.set_test_busy(true);
@@ -281,18 +286,18 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
                     ui.set_connection_result(tested.summary.clone().into()); ui.set_test_passed(true);
                     if c.opening {
                         if let Err(e) = activate(&ui,&state,&root,&mut c,tested) {
-                            ui.set_status_message(i18n::format("Open failed: {0}", &[&e]).into()); ui.set_dialog(1);
+                            set_status_message(&ui, i18n::format("Open failed: {0}", &[&e]).into(), true); ui.set_dialog(1);
                         }
                     } else { c.tested = Some(tested); }
                 }
                 Err(Failure::Message(e)) => {
                     if c.opening { ui.set_active_server(crate::i18n::text("Disconnected").into()); }
-                    c.gate.complete(revision,false); ui.set_connection_result(e.clone().into());
-                    ui.set_status_message(i18n::format("Connection failed: {0}. Retry, edit this server, or File > Servers.", &[&e]).into());
+                    c.gate.complete(revision,false); ui.set_connection_error(true); ui.set_connection_result(e.clone().into());
+                    set_status_message(&ui, i18n::format("Connection failed: {0}. Retry, edit this server, or File > Servers.", &[&e]).into(), true);
                     if c.opening {
                         let id = c.draft.id;
                         if let Some(s) = c.profiles.servers.iter_mut().find(|s| s.id == id) { s.last_status = "Offline".into(); s.last_error = Some(e); }
-                        if let Err(e) = c.profiles.save(&root) { ui.set_status_message(e.into()); }
+                        if let Err(e) = c.profiles.save(&root) { set_status_message(&ui, e.into(), true); }
                         rows(&ui,&c); ui.set_dialog(1);
                     }
                 }
@@ -318,8 +323,10 @@ fn open(
     {
         let mut s = state.lock().unwrap();
         if s.busy || s.dirty {
-            ui.set_status_message(
+            set_status_message(
+                ui,
                 "Save selections and wait for active work before switching servers".into(),
+                false,
             );
             return;
         }
@@ -342,7 +349,11 @@ fn open(
     }
     ui.set_dialog(0);
     ui.set_active_server(i18n::format("Connecting: {0}", &[&server.name]).into());
-    ui.set_status_message(crate::i18n::text("Connecting to selected server...").into());
+    set_status_message(
+        ui,
+        crate::i18n::text("Connecting to selected server...").into(),
+        false,
+    );
     if server.authentication == Authentication::Password && ui.get_form_secret().is_empty() {
         ui.set_dialog(1);
         ui.set_connection_result(
@@ -381,6 +392,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 c.tested = None;
                 c.pending_host = None;
                 c.opening = false;
+                ui.set_connection_error(false);
                 ui.set_test_passed(false);
                 ui.set_test_busy(false);
                 ui.set_connection_result(
@@ -448,6 +460,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 };
                 if tested.server != current || tested.secret.0 != secret.0 {
                     c.gate.invalidate();
+                    ui.set_connection_error(false);
                     ui.set_test_passed(false);
                     return;
                 }
@@ -460,6 +473,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                             .iter()
                             .any(|s| s.id == current.id && s.remember) =>
                     {
+                        ui.set_connection_error(true);
                         ui.set_connection_result(e.into());
                         c.tested = Some(tested);
                         return;
@@ -479,6 +493,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                     Ok(())
                 };
                 if let Err(e) = credential_result {
+                    ui.set_connection_error(true);
                     ui.set_connection_result(e.into());
                     c.tested = Some(tested);
                     return;
@@ -493,6 +508,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                     } else {
                         credentials::remove(current.id)
                     };
+                    ui.set_connection_error(true);
                     ui.set_connection_result(
                         format!(
                             "Profile save failed: {e}; credential rollback: {}",
@@ -509,6 +525,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 }
                 c.profiles = next;
                 if let Err(e) = activate(&ui, &state, &root, &mut c, tested) {
+                    ui.set_connection_error(true);
                     ui.set_connection_result(
                         i18n::format("Profile saved, but opening failed: {0}", &[&e]).into(),
                     );
@@ -561,24 +578,24 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 c.gate.invalidate(); c.tested=None; c.pending_host=None; c.opening=false;
                 ui.set_form_secret("".into()); ui.set_test_busy(false); ui.set_test_passed(false); ui.set_dialog(0);
                 let mut s=state.lock().unwrap(); s.busy=false; render(&ui,&s);
-                if s.server.is_none() { ui.set_active_server(crate::i18n::text("Disconnected").into()); ui.set_status_message(crate::i18n::text("Disconnected — File > New Server or Servers").into()); }
+                if s.server.is_none() { ui.set_active_server(crate::i18n::text("Disconnected").into()); set_status_message(&ui, crate::i18n::text("Disconnected — File > New Server or Servers").into(), false); }
                 return;
             }
-            if !c.editable { ui.set_status_message(crate::i18n::text("Configuration is damaged; repair servers.json before making changes. Original file preserved.").into()); return; }
+            if !c.editable { set_status_message(&ui, crate::i18n::text("Configuration is damaged; repair servers.json before making changes. Original file preserved.").into(), true); return; }
             if state.lock().unwrap().busy { return; }
             if matches!(action.as_str(), "new" | "edit") && state.lock().unwrap().dirty {
-                ui.set_status_message(crate::i18n::text("Save backup selections before editing server profiles").into()); return;
+                set_status_message(&ui, crate::i18n::text("Save backup selections before editing server profiles").into(), false); return;
             }
             if action=="servers" { rows(&ui,&c); ui.set_selected_server(-1); ui.set_dialog(2); return; }
             if action=="new" { c.opening=false; populate(&ui,&mut c,settings::new_server(&ui),Secret::default()); ui.set_dialog(1); return; }
             let Some(server)=c.profiles.servers.get(ui.get_selected_server() as usize).cloned() else {return;};
             match action.as_str() {
                 "edit" => { c.opening=false; populate(&ui,&mut c,server,Secret::default()); ui.set_dialog(1); }
-                "default" => { let mut next=c.profiles.clone(); if let Err(e)=next.set_default(server.id).and_then(|_|next.save(&root)) {ui.set_status_message(e.into());} else {c.profiles=next; rows(&ui,&c);} }
+                "default" => { let mut next=c.profiles.clone(); if let Err(e)=next.set_default(server.id).and_then(|_|next.save(&root)) {set_status_message(&ui, e.into(), true);} else {c.profiles=next; rows(&ui,&c);} }
                 "remove" => {ui.set_host_question(i18n::format("Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact.", &[&server.name,&server.host]).into()); ui.set_dialog(5);}
                 "confirm-remove" => {
                     let mut s=state.lock().unwrap();
-                    if s.busy || s.dirty {ui.set_status_message(crate::i18n::text("Save selections before removing a server").into()); return;}
+                    if s.busy || s.dirty {set_status_message(&ui, crate::i18n::text("Save selections before removing a server").into(), false); return;}
                     let previous=match credentials::read_optional(server.id) {
                         Ok(value) => value,
                         Err(e) if server.remember => {ui.set_host_question(e.into()); return;}

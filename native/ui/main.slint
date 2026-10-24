@@ -1,3 +1,4 @@
+import { SettingsPage, PreferenceEntry } from "settings-page.slint";
 import { LoadingMotion } from "loading-motion.slint";
 import { SelectableText } from "selectable-text.slint";
 import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton, ToggleCheck } from "theme.slint";
@@ -7,7 +8,6 @@ import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
 export { ServerRow } from "dialogs/server-manager.slint";
 import { ListView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
-export struct PreferenceEntry { title: string, description: string, options: [string], choice: int, state: int }
 export struct TreeEntry { key: string, name: string, note: string, depth: int, branch: bool, expanded: bool, selected: bool, app-index: int, container: string }
 export struct PlanEntry { name: string, kind: string, containers: int, selected: int, excluded: int, pending: int, app-index: int }
 export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int, has-method: bool, option-help: string, unavailable-help: string }
@@ -39,7 +39,6 @@ component TreeLine inherits Rectangle {
     accessible-role: button; accessible-label: root.entry.name; accessible-action-default => { root.selected(); }
     forward-focus: focus;
     focus := FocusScope { key-pressed(event) => {
-        if event.modifiers.control && (event.text == "c" || event.text == "C") { copy-label.copy-all(); return accept; }
         if event.text == Key.Return || event.text == " " { root.selected(); return accept; }
         if root.entry.branch && ((event.text == Key.LeftArrow && root.entry.expanded) || (event.text == Key.RightArrow && !root.entry.expanded)) { root.toggled(); return accept; }
         return reject;
@@ -54,7 +53,6 @@ component TreeLine inherits Rectangle {
         Text { text: root.entry.name; color: root.entry.selected ? #145a70 : root.entry.depth == 0 ? #314a63 : #4d6379; font-weight: root.entry.selected || root.entry.branch ? 650 : 450; font-size: 13px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
         Text { text: root.entry.note; color: #8494a5; font-size: 11px; vertical-alignment: center; }
     }
-    copy-label := SelectableText { visible: false; text: root.entry.name; }
 }
 export component ContainerSafeWindow inherits Window {
     title: "ContainerSafe " + root.app-version + " — " + root.active-server;
@@ -108,6 +106,8 @@ export component ContainerSafeWindow inherits Window {
     in-out property <bool> form-remember;
     in-out property <int> form-docker;
     in-out property <string> form-timeout: "10";
+    in-out property <bool> connection-error: false;
+    in-out property <bool> status-error: false;
     in-out property <string> connection-result: @tr("Not tested");
     in-out property <int> loading-animation: 1;
     in-out property <string> connection-step;
@@ -183,26 +183,8 @@ export component ContainerSafeWindow inherits Window {
                 padding: 24px; spacing: 14px;
                 SelectableText { text: @tr("Make ContainerSafe yours"); font-size: 20px; font-weight: 700; text-color: Theme.ink; }
                 SelectableText { text: @tr("Appearance and startup apply here. Connection defaults apply only to new server profiles. Backup selections are saved separately."); text-color: Theme.muted; wrap: word-wrap; }
-                if root.settings-error != "" : SelectableText { text: root.settings-error; text-color: #a34431; wrap: word-wrap; }
-                ListView {
-                    for setting[index] in root.preferences: Rectangle {
-                        height: index == 7 ? 160px : 132px;
-                        Rectangle { y: 6px; height: parent.height - 12px; width: parent.width; background: white; border-radius: 8px; border-width: 1px; border-color: Theme.line;
-                        HorizontalLayout { padding: 18px; spacing: 24px;
-                            VerticalLayout { spacing: 5px; horizontal-stretch: 1;
-                                SelectableText { text: setting.title; font-size: 14px; font-weight: 650; text-color: Theme.ink; }
-                                SelectableText { text: setting.description; wrap: word-wrap; text-color: Theme.muted; font-size: 12px; }
-                                SelectableText { text: setting.state == 1 ? @tr("Saved automatically") : setting.state == 2 ? @tr("Could not save. Your previous setting is still active.") : ""; text-color: setting.state == 2 ? #a34431 : #39765c; font-size: 11px; }
-                            }
-                            VerticalLayout { alignment: center; width: 260px;
-                                if index == 7 : HorizontalLayout { alignment: center; LoadingMotion { kind: setting.choice; } }
-                                if index != 6 : ComboBox { model: setting.options; current-index: setting.choice; enabled: root.settings-editable; selected(value) => { root.preference-changed(index, self.current-index); } }
-                                if index == 6 : ToggleCheck { text: setting.choice == 1 ? @tr("On") : @tr("Off"); checked: setting.choice == 1; enabled: root.settings-editable; toggled => { root.preference-changed(index, self.checked ? 1 : 0); } }
-                            }
-                        }
-                        }
-                    }
-                }
+                if root.settings-error != "" : SelectableText { selectable: true; text: root.settings-error; text-color: #a34431; wrap: word-wrap; }
+                SettingsPage { preferences: root.preferences; editable: root.settings-editable; changed(index, value) => { root.preference-changed(index, value); } }
             }
             if root.page == 0 : VerticalLayout {
                 padding: 22px; spacing: 18px;
@@ -338,7 +320,7 @@ export component ContainerSafeWindow inherits Window {
             }
             if root.page != 4 : Rectangle { height: 38px; background: white;
                 HorizontalLayout { padding-left: 24px; padding-right: 24px; spacing: 14px;
-                    SelectableText { text: root.status-message; text-color: #556c82; font-size: 11px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
+                    SelectableText { selectable: root.status-error; text: root.status-message; text-color: #556c82; font-size: 11px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
                     SelectableText { text: root.validation-message; text-color: #7b8da2; font-size: 11px; overflow: elide; vertical-alignment: center; }
                 }
             }
@@ -356,7 +338,7 @@ export component ContainerSafeWindow inherits Window {
             username <=> root.form-user; authentication <=> root.form-auth; key-path <=> root.form-key;
             ssh-key-compatibility: root.ssh-key-compatibility;
             secret <=> root.form-secret; remember <=> root.form-remember; docker-access <=> root.form-docker;
-            timeout <=> root.form-timeout; result: root.connection-result; busy: root.test-busy; tested: root.test-passed;
+            timeout <=> root.form-timeout; result: root.connection-result; result-error: root.connection-error; busy: root.test-busy; tested: root.test-passed;
             edited => { root.form-edited(); } test => { root.test-server(); } save => { root.save-server(); }
             browse => { root.browse-key(); } cancel => { root.server-action("cancel"); }
             init => { self.focus-first(); }
@@ -373,7 +355,7 @@ export component ContainerSafeWindow inherits Window {
             VerticalLayout {
                 padding: 24px; spacing: 14px;
                 SelectableText { text: root.dialog == 5 ? @tr("Remove server?") : root.host-changed ? @tr("HOST KEY CHANGED — connection blocked") : @tr("Trust SSH host identity?"); text-color: #8b641e; font-weight: 700; font-size: 18px; }
-                SelectableText { text: root.host-question; wrap: word-wrap; text-color: #3b536b; }
+                SelectableText { selectable: root.host-changed; text: root.host-question; wrap: word-wrap; text-color: #3b536b; }
                 HorizontalLayout {
                     Button { text: @tr("Cancel / Reject"); clicked => { root.server-action("cancel"); } }
                     Button { text: root.dialog == 5 ? @tr("Remove profile and credential") : root.host-changed ? @tr("Approve reviewed replacement") : @tr("Trust this host");

@@ -925,3 +925,27 @@ msgstr "9 · Cascadă"
 msgid "10 · Infinity"
 msgstr "10 · Infinit"
 
+msgid "Copy host"
+msgstr "Copiază adresa"
+
+msgid "Copied"
+msgstr "Copiat"
+
+msgid "Appearance & language"
+msgstr "Aspect și limbă"
+
+msgid "Personalize the interface and connection animation."
+msgstr "Personalizează interfața și animația de conectare."
+
+msgid "Startup & workspace"
+msgstr "Pornire și spațiu de lucru"
+
+msgid "Choose what opens and which sources are shown when you start."
+msgstr "Alege pagina de pornire și sursele afișate inițial."
+
+msgid "New server defaults"
+msgstr "Valori implicite pentru servere noi"
+
+msgid "Starting values for new profiles. Existing servers keep their configuration."
+msgstr "Valori inițiale pentru profilurile noi. Serverele existente își păstrează configurația."
+

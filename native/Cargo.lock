@@ -996,7 +996,7 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "containersafe"
-version = "0.21.0"
+version = "0.23.0"
 dependencies = [
  "aes",
  "base64 0.22.1",
@@ -1016,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "containersafe-native"
-version = "0.21.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "containersafe",
@@ -5354,6 +5354,7 @@ dependencies = [
  "const-field-offset",
  "i-slint-backend-linuxkms",
  "i-slint-backend-selector",
+ "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",

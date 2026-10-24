@@ -91,6 +91,11 @@ struct State {
 
 type SharedState = Arc<Mutex<State>>;
 
+fn set_status_message(ui: &ContainerSafeWindow, message: slint::SharedString, is_error: bool) {
+    ui.set_status_error(is_error);
+    ui.set_status_message(message);
+}
+
 fn empty_report() -> BackupReport {
     BackupReport {
         schema_version: 1,
@@ -781,7 +786,7 @@ fn create_main_window(
     ui.set_ssh_key_compatibility(
         i18n::text(containersafe::servers::model::SSH_KEY_COMPATIBILITY).into(),
     );
-    ui.set_status_message(i18n::text(&first_status).into());
+    set_status_message(&ui, i18n::text(&first_status).into(), false);
     ui.set_validation_message(i18n::text("Selection not verified for execution").into());
 
     {
@@ -868,7 +873,7 @@ fn create_main_window(
             }
             guard.dirty = true;
             render(&ui, &guard);
-            ui.set_status_message(i18n::text("Unsaved selection changes").into());
+            set_status_message(&ui, i18n::text("Unsaved selection changes").into(), false);
             ui.set_validation_message(i18n::text("Validation needed").into());
         });
     }
@@ -901,18 +906,17 @@ fn create_main_window(
                 Ok(()) => {
                     guard.dirty = false;
                     render(&ui, &guard);
-                    ui.set_status_message(
+                    set_status_message(&ui,
                         i18n::format(
                             "Selection saved · {0} selected operations · {1} with no backup selected",
                             &[&selected_count(&guard).to_string(), &pending_count(&guard).to_string()]
                         )
-                        .into(),
-                    );
+                        .into(), false);
                     ui.set_validation_message(
                         crate::i18n::text("Saved; requires validation").into(),
                     );
                 }
-                Err(error) => ui.set_status_message(format!("SAVE ERROR: {error}").into()),
+                Err(error) => set_status_message(&ui, format!("SAVE ERROR: {error}").into(), true),
             }
         });
     }
@@ -933,8 +937,10 @@ fn create_main_window(
                     return;
                 }
                 if guard.dirty {
-                    ui.set_status_message(
+                    set_status_message(
+                        &ui,
                         crate::i18n::text("Save changes before validation").into(),
+                        false,
                     );
                     return;
                 }
@@ -943,8 +949,10 @@ fn create_main_window(
                 }
                 guard.busy = true;
                 render(&ui, &guard);
-                ui.set_status_message(
+                set_status_message(
+                    &ui,
                     crate::i18n::text("Validating selection with existing Rust CLI...").into(),
+                    false,
                 );
             }
             let weak = weak.clone();
@@ -967,19 +975,21 @@ fn create_main_window(
                     render(&ui, &guard);
                     match result {
                         Ok((true, info)) => {
-                            ui.set_status_message(
+                            set_status_message(
+                                &ui,
                                 format!("{info}. Restore and preflight still required.").into(),
+                                false,
                             );
                             ui.set_validation_message(
                                 "Selection valid · no backup authorized".into(),
                             );
                         }
                         Ok((false, info)) => {
-                            ui.set_status_message(info.into());
+                            set_status_message(&ui, info.into(), true);
                             ui.set_validation_message(crate::i18n::text("Needs review").into());
                         }
                         Err(error) => {
-                            ui.set_status_message(format!("VALIDATE ERROR: {error}").into())
+                            set_status_message(&ui, format!("VALIDATE ERROR: {error}").into(), true)
                         }
                     }
                 });
@@ -1093,6 +1103,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     slint::select_bundled_translation(if language == 1 { "ro" } else { "" })?;
     splash.set_loading_progress(5);
     splash.set_loading_message(crate::i18n::text("Starting ContainerSafe...").into());
+    // The native window does not exist before the event loop starts. Center at
+    // its first redraw, before Slint paints, rather than silently missing it.
+    {
+        use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
+        let mut centered = false;
+        splash
+            .window()
+            .on_winit_window_event(move |slint_window, event| {
+                if !centered && matches!(event, winit::event::WindowEvent::RedrawRequested) {
+                    centered = slint_window
+                        .with_winit_window(|window| {
+                            let Some(monitor) = window
+                                .current_monitor()
+                                .or_else(|| window.primary_monitor())
+                            else {
+                                return false;
+                            };
+                            let origin = monitor.position();
+                            let screen = monitor.size();
+                            let size = window.outer_size();
+                            if size.width == 0 || size.height == 0 {
+                                return false;
+                            }
+                            window.set_outer_position(winit::dpi::PhysicalPosition::new(
+                                origin.x + (screen.width as i32 - size.width as i32) / 2,
+                                origin.y + (screen.height as i32 - size.height as i32) / 2,
+                            ));
+                            true
+                        })
+                        .unwrap_or(false);
+                }
+                EventResult::Propagate
+            });
+    }
     splash.show()?;
 
     // All disk I/O is performed off the UI thread.

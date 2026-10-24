@@ -1,0 +1,55 @@
+import { SelectableText } from "selectable-text.slint";
+import { LoadingMotion } from "loading-motion.slint";
+import { Theme, ChoiceBox, ToggleCheck } from "theme.slint";
+import { ScrollView } from "std-widgets.slint";
+export struct PreferenceEntry { title: string, description: string, options: [string], choice: int, state: int }
+component PreferenceRow inherits Rectangle {
+    in property <PreferenceEntry> item;
+    in property <int> index;
+    in property <bool> editable;
+    callback changed(int, int);
+    height: root.index == 7 ? 154px : 110px;
+    HorizontalLayout { spacing: 28px; padding-top: 14px; padding-bottom: 14px;
+        VerticalLayout { alignment: center; spacing: 5px; horizontal-stretch: 1;
+            SelectableText { text: root.item.title; text-color: Theme.ink; font-size: 14px; font-weight: 600; }
+            SelectableText { text: root.item.description; text-color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+            if root.item.state != 0 : SelectableText { selectable: root.item.state == 2; text: root.item.state == 1 ? @tr("Saved automatically") : @tr("Could not save. Your previous setting is still active."); font-size: 11px; text-color: root.item.state == 1 ? #39765c : #a34431; wrap: word-wrap; }
+        }
+        VerticalLayout { alignment: center; width: 260px;
+            if root.index == 7 : HorizontalLayout { alignment: center; LoadingMotion { kind: root.item.choice; } }
+            if root.index != 6 : ChoiceBox { model: root.item.options; current-index: root.item.choice; enabled: root.editable; selected(value) => { root.changed(root.index, self.current-index); } }
+            if root.index == 6 : ToggleCheck { text: root.item.choice == 1 ? @tr("On") : @tr("Off"); checked: root.item.choice == 1; enabled: root.editable; toggled => { root.changed(root.index, self.checked ? 1 : 0); } }
+        }
+    }
+    Rectangle { y: parent.height - 1px; height: 1px; width: parent.width; background: #edf1f5; }
+}
+component PreferenceGroup inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <[int]> indices;
+    in property <[PreferenceEntry]> preferences;
+    in property <bool> editable;
+    in property <bool> animation;
+    callback changed(int, int);
+    height: 92px + root.indices.length * 110px + (root.animation ? 44px : 0px);
+    background: white; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+    VerticalLayout { padding: 20px; spacing: 0px;
+        VerticalLayout { height: 52px; spacing: 5px; alignment: start;
+            SelectableText { text: root.title; text-color: Theme.ink; font-size: 17px; font-weight: 700; }
+            SelectableText { text: root.description; text-color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+        }
+        for preference-index in root.indices: PreferenceRow { index: preference-index; item: root.preferences[preference-index]; editable: root.editable; changed(index, value) => { root.changed(index, value); } }
+    }
+}
+export component SettingsPage inherits Rectangle {
+    in property <[PreferenceEntry]> preferences;
+    in property <bool> editable;
+    callback changed(int, int);
+    ScrollView {
+        VerticalLayout { spacing: 18px;
+            PreferenceGroup { title: @tr("Appearance & language"); description: @tr("Personalize the interface and connection animation."); indices: [0,7]; preferences: root.preferences; editable: root.editable; animation: true; changed(index, value) => { root.changed(index, value); } }
+            PreferenceGroup { title: @tr("Startup & workspace"); description: @tr("Choose what opens and which sources are shown when you start."); indices: [1,2,6]; preferences: root.preferences; editable: root.editable; changed(index, value) => { root.changed(index, value); } }
+            PreferenceGroup { title: @tr("New server defaults"); description: @tr("Starting values for new profiles. Existing servers keep their configuration."); indices: [3,4,5]; preferences: root.preferences; editable: root.editable; changed(index, value) => { root.changed(index, value); } }
+        }
+    }
+}
