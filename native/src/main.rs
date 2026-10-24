@@ -10,7 +10,9 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+mod i18n;
 mod server_ui;
+mod settings;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -333,7 +335,7 @@ fn decision_options(database: bool, policy: &str) -> ModelRc<slint::SharedString
     ModelRc::new(VecModel::from(
         decision_values(database, policy)
             .iter()
-            .map(|value| display_decision(value).into())
+            .map(|value| i18n::text(display_decision(value)).into())
             .collect::<Vec<_>>(),
     ))
 }
@@ -412,7 +414,7 @@ fn container_tree(
         let is_open = !filter.is_empty() || expanded.contains(group);
         rows.push(TreeEntry {
             key: group.into(),
-            name: if compose { "Compose" } else { "Standalone" }.into(),
+            name: i18n::text(if compose { "Compose" } else { "Standalone" }).into(),
             note: projects
                 .iter()
                 .map(|(_, app)| app.containers.len())
@@ -543,22 +545,22 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
         ui.set_active_index(-1);
         ui.set_entries(ModelRc::new(VecModel::from(Vec::<DataEntry>::new())));
         ui.set_selected_name(
-            if state.server.is_none() {
+            i18n::text(if state.server.is_none() {
                 "No server connected"
             } else {
                 "No containers detected"
-            }
+            })
             .into(),
         );
         ui.set_selected_summary(
-            if state.server.is_none() {
+            i18n::text(if state.server.is_none() {
                 "Connect a Docker server from File > New Server or Servers"
             } else {
                 "Refresh to query the selected server"
-            }
+            })
             .into(),
         );
-        ui.set_selected_warning("Backup execution is disabled".into());
+        ui.set_selected_warning(crate::i18n::text("Backup execution is disabled").into());
         return;
     };
     ui.set_active_index(state.active as i32);
@@ -573,23 +575,25 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
         .filter(|name| app.containers.iter().any(|c| c == name));
     ui.set_selected_name(container.unwrap_or(project).trim_start_matches('/').into());
     ui.set_selected_summary(
-        format!(
-            "{} · {} containers · {} storage sources · {} databases",
-            if app.application.starts_with("compose/") {
-                format!("Compose / {project} · project-wide storage")
-            } else {
-                "Standalone container".into()
-            },
-            app.containers.len(),
-            app.sources.len(),
-            app.databases.len()
+        i18n::format(
+            "{0} · {1} containers · {2} storage sources · {3} databases",
+            &[
+                &if app.application.starts_with("compose/") {
+                    i18n::format("Compose / {0} · project-wide storage", &[project])
+                } else {
+                    i18n::text("Standalone container")
+                },
+                &app.containers.len().to_string(),
+                &app.sources.len().to_string(),
+                &app.databases.len().to_string(),
+            ],
         )
         .into(),
     );
     ui.set_selected_warning(
-        format!(
-            "{} items need recovery review · no backup created",
-            app.warnings.len()
+        i18n::format(
+            "{0} items need recovery review · no backup created",
+            &[&app.warnings.len().to_string()],
         )
         .into(),
     );
@@ -612,13 +616,13 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
         };
         entries.push(DataEntry {
             has_method: has_backup_method(false, &source.policy),
-            option_help: backup_option_help(false, &source.policy).into(),
-            unavailable_help: unavailable_backup_help(false, &source.policy).into(),
+            option_help: i18n::paragraphs(&backup_option_help(false, &source.policy)).into(),
+            unavailable_help: i18n::text(&unavailable_backup_help(false, &source.policy)).into(),
             row_index: source_index as i32,
             title: source_label(&source.path).into(),
             location: source.path.as_str().into(),
-            detail: format!("{}  ·  {}", detail, source.destination).into(),
-            decision: display_decision(decision).into(),
+            detail: format!("{}  ·  {}", i18n::text(detail), source.destination).into(),
+            decision: i18n::text(display_decision(decision)).into(),
             options: decision_options(false, &source.policy),
             choice: decision_values(false, &source.policy)
                 .iter()
@@ -635,13 +639,14 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             .unwrap_or("pending");
         entries.push(DataEntry {
             has_method: has_backup_method(true, &db.engine),
-            option_help: backup_option_help(true, &db.engine).into(),
-            unavailable_help: unavailable_backup_help(true, &db.engine).into(),
+            option_help: i18n::paragraphs(&backup_option_help(true, &db.engine)).into(),
+            unavailable_help: i18n::text(&unavailable_backup_help(true, &db.engine)).into(),
             row_index: (app.sources.len() + database_index) as i32,
             title: db.container.as_str().into(),
             location: db.engine.as_str().into(),
-            detail: format!("Adapter: {} · not executable yet", db.required_method).into(),
-            decision: display_decision(decision).into(),
+            detail: i18n::format("Adapter: {0} · not executable yet", &[&db.required_method])
+                .into(),
+            decision: i18n::text(display_decision(decision)).into(),
             options: decision_options(true, &db.engine),
             choice: decision_values(true, &db.engine)
                 .iter()
@@ -705,11 +710,11 @@ fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<Plan
                     .map(|(_, name)| name)
                     .unwrap_or(&app.application)
                     .into(),
-                kind: if app.application.starts_with("compose/") {
+                kind: i18n::text(if app.application.starts_with("compose/") {
                     "Compose"
                 } else {
                     "Standalone"
-                }
+                })
                 .into(),
                 containers: app.containers.len() as i32,
                 selected: decisions
@@ -754,14 +759,17 @@ fn create_main_window(
 ) -> Result<ContainerSafeWindow, Box<dyn std::error::Error>> {
     let state: SharedState = Arc::new(Mutex::new(initial));
     let ui = ContainerSafeWindow::new()?;
+    settings::install(&ui, root.clone(), state.clone());
     {
         let guard = state.lock().expect("state mutex poisoned");
         render(&ui, &guard);
     }
     ui.set_app_version(containersafe::VERSION.into());
-    ui.set_ssh_key_compatibility(containersafe::servers::model::SSH_KEY_COMPATIBILITY.into());
-    ui.set_status_message(first_status.into());
-    ui.set_validation_message("Selection not verified for execution".into());
+    ui.set_ssh_key_compatibility(
+        i18n::text(containersafe::servers::model::SSH_KEY_COMPATIBILITY).into(),
+    );
+    ui.set_status_message(i18n::text(&first_status).into());
+    ui.set_validation_message(i18n::text("Selection not verified for execution").into());
 
     {
         let weak = ui.as_weak();
@@ -847,8 +855,8 @@ fn create_main_window(
             }
             guard.dirty = true;
             render(&ui, &guard);
-            ui.set_status_message("Unsaved selection changes".into());
-            ui.set_validation_message("Validation needed".into());
+            ui.set_status_message(i18n::text("Unsaved selection changes").into());
+            ui.set_validation_message(i18n::text("Validation needed").into());
         });
     }
 
@@ -881,14 +889,15 @@ fn create_main_window(
                     guard.dirty = false;
                     render(&ui, &guard);
                     ui.set_status_message(
-                        format!(
-                            "Selection saved · {} selected operations · {} with no backup selected",
-                            selected_count(&guard),
-                            pending_count(&guard)
+                        i18n::format(
+                            "Selection saved · {0} selected operations · {1} with no backup selected",
+                            &[&selected_count(&guard).to_string(), &pending_count(&guard).to_string()]
                         )
                         .into(),
                     );
-                    ui.set_validation_message("Saved; requires validation".into());
+                    ui.set_validation_message(
+                        crate::i18n::text("Saved; requires validation").into(),
+                    );
                 }
                 Err(error) => ui.set_status_message(format!("SAVE ERROR: {error}").into()),
             }
@@ -911,7 +920,9 @@ fn create_main_window(
                     return;
                 }
                 if guard.dirty {
-                    ui.set_status_message("Save changes before validation".into());
+                    ui.set_status_message(
+                        crate::i18n::text("Save changes before validation").into(),
+                    );
                     return;
                 }
                 if guard.server.is_none() {
@@ -919,7 +930,9 @@ fn create_main_window(
                 }
                 guard.busy = true;
                 render(&ui, &guard);
-                ui.set_status_message("Validating selection with existing Rust CLI...".into());
+                ui.set_status_message(
+                    crate::i18n::text("Validating selection with existing Rust CLI...").into(),
+                );
             }
             let weak = weak.clone();
             let state = Arc::clone(&state);
@@ -950,7 +963,7 @@ fn create_main_window(
                         }
                         Ok((false, info)) => {
                             ui.set_status_message(info.into());
-                            ui.set_validation_message("Needs review".into());
+                            ui.set_validation_message(crate::i18n::text("Needs review").into());
                         }
                         Err(error) => {
                             ui.set_status_message(format!("VALIDATE ERROR: {error}").into())
@@ -1054,9 +1067,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let root = storage::config_root().map_err(std::io::Error::other)?;
+    let language = settings::Preferences::load(&root)
+        .unwrap_or_default()
+        .language();
+    i18n::set_language(language);
     let splash = SplashWindow::new()?;
+    slint::select_bundled_translation(if language == 1 { "ro" } else { "" })?;
     splash.set_loading_progress(5);
-    splash.set_loading_message("Pornesc ContainerSafe...".into());
+    splash.set_loading_message(crate::i18n::text("Starting ContainerSafe...").into());
     splash.show()?;
 
     // All disk I/O is performed off the UI thread.
@@ -1089,11 +1107,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match event {
                 StartupEvent::Progress(percent, message) => {
                     splash.set_loading_progress(percent);
-                    splash.set_loading_message(message.into());
+                    splash.set_loading_message(i18n::text(&message).into());
                 }
                 StartupEvent::Loaded(state, message) => {
                     splash.set_loading_progress(100);
-                    splash.set_loading_message("Gata".into());
+                    splash.set_loading_message(i18n::text("Complete").into());
                     ready_at = Some(Instant::now());
                     loaded = Some((*state, message));
                 }
@@ -1115,7 +1133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(()) => {
                         *keep_main.borrow_mut() = Some(ui);
                         splash.set_loading_progress(100);
-                        splash.set_loading_message("Gata".into());
+                        splash.set_loading_message(i18n::text("Complete").into());
                         let _ = splash.hide();
                         finished = true;
                     }

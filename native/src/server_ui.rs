@@ -33,17 +33,17 @@ fn rows(ui: &ContainerSafeWindow, c: &Controller) {
                 name: s.name.clone().into(),
                 host: format!("{}:{}", s.host, s.port).into(),
                 status: if c.active.as_ref().is_some_and(|active| active.id == s.id) {
-                    "Connected".into()
+                    i18n::text("Connected").into()
                 } else if s.last_status == "Connected" {
-                    "Last success".into()
+                    i18n::text("Last success").into()
                 } else {
-                    s.last_status.clone().into()
+                    i18n::text(&s.last_status).into()
                 },
                 last_opened: s
                     .last_opened
                     .and_then(|v| chrono::DateTime::from_timestamp(v as i64, 0))
                     .map(|v| v.format("%Y-%m-%d %H:%M UTC").to_string())
-                    .unwrap_or("Never".into())
+                    .unwrap_or_else(|| i18n::text("Never"))
                     .into(),
                 default_server: c.profiles.default == Some(s.id),
             })
@@ -76,7 +76,7 @@ fn populate(ui: &ContainerSafeWindow, c: &mut Controller, server: Server, secret
     ui.set_form_timeout(server.timeout_seconds.to_string().into());
     ui.set_test_passed(false);
     ui.set_test_busy(false);
-    ui.set_connection_result("Not tested".into());
+    ui.set_connection_result(crate::i18n::text("Not tested").into());
 }
 
 fn form(ui: &ContainerSafeWindow, c: &Controller) -> Result<(Server, Secret), String> {
@@ -86,7 +86,7 @@ fn form(ui: &ContainerSafeWindow, c: &Controller) -> Result<(Server, Secret), St
     s.port = ui
         .get_form_port()
         .parse()
-        .map_err(|_| "SSH port must be between 1 and 65535")?;
+        .map_err(|_| i18n::text("SSH port must be between 1 and 65535"))?;
     s.username = ui.get_form_user().trim().into();
     s.authentication = match ui.get_form_auth() {
         1 => Authentication::Putty,
@@ -103,11 +103,11 @@ fn form(ui: &ContainerSafeWindow, c: &Controller) -> Result<(Server, Secret), St
     s.timeout_seconds = ui
         .get_form_timeout()
         .parse()
-        .map_err(|_| "Timeout must be 1-120 seconds")?;
-    s.validate()?;
+        .map_err(|_| i18n::text("Timeout must be 1-120 seconds"))?;
+    s.validate().map_err(|e| i18n::text(&e))?;
     let secret = Secret(ui.get_form_secret().to_string());
     if s.authentication == Authentication::Password && secret.0.is_empty() {
-        return Err("Password required".into());
+        return Err(i18n::text("Password required"));
     }
     Ok((s, secret))
 }
@@ -125,7 +125,7 @@ fn probe(
             .map_err(|_| "Cannot build plan".to_string())?,
     )
     .map_err(|_| "Cannot read plan".to_string())?;
-    let summary = format!("SSH: Connected\nHost identity: Verified\nAuthentication: Successful\nDocker: Available\nEngine: {}\nPermissions: Granted\nContainers detected: {}\nServer ready to save.", version.trim(), containers.len());
+    let summary = i18n::format("SSH: Connected\nHost identity: Verified\nAuthentication: Successful\nDocker: Available\nEngine: {0}\nPermissions: Granted\nContainers detected: {1}\nServer ready to save.", &[version.trim(), &containers.len().to_string()]);
     Ok(Tested {
         server,
         secret,
@@ -177,13 +177,13 @@ fn activate(
     render(ui, &s);
     ui.set_active_server(format!("{} · {}", tested.server.name, tested.server.host).into());
     ui.set_status_message(
-        format!(
-            "Connected to {} · save reconciled backup selections",
-            tested.server.name
+        i18n::format(
+            "Connected to {0} · save reconciled backup selections",
+            &[&tested.server.name],
         )
         .into(),
     );
-    ui.set_validation_message("Plan changed; validation required".into());
+    ui.set_validation_message(crate::i18n::text("Plan changed; validation required").into());
     ui.set_dialog(0);
     ui.set_form_secret("".into());
     rows(ui, c);
@@ -258,14 +258,14 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
                     ui.set_connection_result(tested.summary.clone().into()); ui.set_test_passed(true);
                     if c.opening {
                         if let Err(e) = activate(&ui,&state,&root,&mut c,tested) {
-                            ui.set_status_message(format!("Open failed: {e}").into()); ui.set_dialog(1);
+                            ui.set_status_message(i18n::format("Open failed: {0}", &[&e]).into()); ui.set_dialog(1);
                         }
                     } else { c.tested = Some(tested); }
                 }
                 Err(Failure::Message(e)) => {
-                    if c.opening { ui.set_active_server("Disconnected".into()); }
+                    if c.opening { ui.set_active_server(crate::i18n::text("Disconnected").into()); }
                     c.gate.complete(revision,false); ui.set_connection_result(e.clone().into());
-                    ui.set_status_message(format!("Connection failed: {e}. Retry, edit this server, or File > Servers.").into());
+                    ui.set_status_message(i18n::format("Connection failed: {0}. Retry, edit this server, or File > Servers.", &[&e]).into());
                     if c.opening {
                         let id = c.draft.id;
                         if let Some(s) = c.profiles.servers.iter_mut().find(|s| s.id == id) { s.last_status = "Offline".into(); s.last_error = Some(e); }
@@ -276,8 +276,8 @@ fn begin(ui: &ContainerSafeWindow, control: &Control, state: &SharedState, root:
                 Err(Failure::UnknownHost(h)) | Err(Failure::ChangedHost(h)) => {
                     let changed = c.profiles.hosts.contains_key(&h.endpoint);
                     ui.set_host_changed(changed);
-                    let previous = c.profiles.hosts.get(&h.endpoint).map(|v| format!("\nPreviously trusted: {v}")).unwrap_or_default();
-                    ui.set_host_question(format!("Host: {}\nKey type: {}\nFingerprint: {}{}\n\nVerify this fingerprint through a trusted channel before approval. Credentials have not been sent.", h.endpoint, h.key_type, h.fingerprint, previous).into());
+                    let previous = c.profiles.hosts.get(&h.endpoint).map(|v| i18n::format("\nPreviously trusted: {0}", &[v])).unwrap_or_default();
+                    ui.set_host_question(i18n::format("Host: {0}\nKey type: {1}\nFingerprint: {2}{3}\n\nVerify this fingerprint through a trusted channel before approval. Credentials have not been sent.", &[&h.endpoint, &h.key_type, &h.fingerprint, &previous]).into());
                     c.pending_host = Some(h); ui.set_dialog(3);
                 }
             }
@@ -318,8 +318,8 @@ fn open(
         render(ui, &s);
     }
     ui.set_dialog(0);
-    ui.set_active_server(format!("Connecting: {}", server.name).into());
-    ui.set_status_message("Connecting to selected server...".into());
+    ui.set_active_server(i18n::format("Connecting: {0}", &[&server.name]).into());
+    ui.set_status_message(crate::i18n::text("Connecting to selected server...").into());
     if server.authentication == Authentication::Password && ui.get_form_secret().is_empty() {
         ui.set_dialog(1);
         ui.set_connection_result(
@@ -357,7 +357,9 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 c.opening = false;
                 ui.set_test_passed(false);
                 ui.set_test_busy(false);
-                ui.set_connection_result("Changed — test this configuration again".into());
+                ui.set_connection_result(
+                    crate::i18n::text("Changed — test this configuration again").into(),
+                );
                 let mut s = state.lock().unwrap();
                 s.busy = false;
                 render(&ui, &s);
@@ -482,7 +484,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 c.profiles = next;
                 if let Err(e) = activate(&ui, &state, &root, &mut c, tested) {
                     ui.set_connection_result(
-                        format!("Profile saved, but opening failed: {e}").into(),
+                        i18n::format("Profile saved, but opening failed: {0}", &[&e]).into(),
                     );
                     rows(&ui, &c);
                 }
@@ -532,24 +534,24 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                 c.gate.invalidate(); c.tested=None; c.pending_host=None; c.opening=false;
                 ui.set_form_secret("".into()); ui.set_test_busy(false); ui.set_test_passed(false); ui.set_dialog(0);
                 let mut s=state.lock().unwrap(); s.busy=false; render(&ui,&s);
-                if s.server.is_none() { ui.set_active_server("Disconnected".into()); ui.set_status_message("Disconnected — File > New Server or Servers".into()); }
+                if s.server.is_none() { ui.set_active_server(crate::i18n::text("Disconnected").into()); ui.set_status_message(crate::i18n::text("Disconnected — File > New Server or Servers").into()); }
                 return;
             }
-            if !c.editable { ui.set_status_message("Configuration is damaged; repair servers.json before making changes. Original file preserved.".into()); return; }
+            if !c.editable { ui.set_status_message(crate::i18n::text("Configuration is damaged; repair servers.json before making changes. Original file preserved.").into()); return; }
             if state.lock().unwrap().busy { return; }
             if matches!(action.as_str(), "new" | "edit") && state.lock().unwrap().dirty {
-                ui.set_status_message("Save backup selections before editing server profiles".into()); return;
+                ui.set_status_message(crate::i18n::text("Save backup selections before editing server profiles").into()); return;
             }
             if action=="servers" { rows(&ui,&c); ui.set_selected_server(-1); ui.set_dialog(2); return; }
-            if action=="new" { c.opening=false; populate(&ui,&mut c,Server::default(),Secret::default()); ui.set_dialog(1); return; }
+            if action=="new" { c.opening=false; populate(&ui,&mut c,settings::new_server(&ui),Secret::default()); ui.set_dialog(1); return; }
             let Some(server)=c.profiles.servers.get(ui.get_selected_server() as usize).cloned() else {return;};
             match action.as_str() {
                 "edit" => { c.opening=false; populate(&ui,&mut c,server,Secret::default()); ui.set_dialog(1); }
                 "default" => { let mut next=c.profiles.clone(); if let Err(e)=next.set_default(server.id).and_then(|_|next.save(&root)) {ui.set_status_message(e.into());} else {c.profiles=next; rows(&ui,&c);} }
-                "remove" => {ui.set_host_question(format!("Remove {} ({}) and its stored credentials? Remote data and private-key files stay intact.",server.name,server.host).into()); ui.set_dialog(5);}
+                "remove" => {ui.set_host_question(i18n::format("Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact.", &[&server.name,&server.host]).into()); ui.set_dialog(5);}
                 "confirm-remove" => {
                     let mut s=state.lock().unwrap();
-                    if s.busy || s.dirty {ui.set_status_message("Save selections before removing a server".into()); return;}
+                    if s.busy || s.dirty {ui.set_status_message(crate::i18n::text("Save selections before removing a server").into()); return;}
                     let previous=match credentials::read_optional(server.id) {
                         Ok(value) => value,
                         Err(e) if server.remember => {ui.set_host_question(e.into()); return;}
@@ -561,7 +563,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
                     let mut next=c.profiles.clone(); next.remove(server.id);
                     if let Err(e)=next.save(&root) { if let Some(secret)=previous { let _=credentials::write(server.id,&secret); } ui.set_host_question(e.into()); return; }
                     c.profiles=next;
-                    if s.server.as_ref().is_some_and(|v|v.id==server.id) {c.active=None; s.server=None; s.secret=Secret::default(); s.report=empty_report(); s.selection=draft(&s.report); render(&ui,&s); ui.set_active_server("Disconnected".into());}
+                    if s.server.as_ref().is_some_and(|v|v.id==server.id) {c.active=None; s.server=None; s.secret=Secret::default(); s.report=empty_report(); s.selection=draft(&s.report); render(&ui,&s); ui.set_active_server(crate::i18n::text("Disconnected").into());}
                     rows(&ui,&c); ui.set_selected_server(-1); ui.set_dialog(2);
                 }
                 "open" => {drop(c); open(&ui,&control,&state,&root,server);}
@@ -600,7 +602,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
     slint::Timer::single_shot(Duration::from_millis(1), move || {
         if let Some(ui) = weak.upgrade() {
             let c = control.lock().unwrap();
-            if !c.editable {
+            if !c.editable || settings::choice(&ui, 6) == 0 {
                 return;
             }
             let default = c

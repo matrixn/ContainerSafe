@@ -2,6 +2,13 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.17 — 2026-10-25
+
+- Add File → Settings and sidebar navigation with descriptive preference cards, immediate atomic saves, individual success/failure feedback and protection for malformed settings files.
+- Implement English (default) and Romanian, bundled into the executable, with live language switching for desktop navigation, dialogs, help, selections and preferences. Preserve original remote technical output.
+- Configure startup page/source filter, new-profile SSH port/timeout/Docker defaults, and optional default-server connection at launch. Preserve existing profiles, explicit backup selection saves and mandatory host-key verification.
+- Add isolated persistence, invalid-configuration and failed-write tests; increment application/native version to 0.17.
+
 ## 0.16 — 2026-10-24
 
 - Show only stacks/standalone containers with at least one selectable Include or Logical dump method in Backup plans; No backup and Exclude do not count as methods. Preserve original Review targets and update plan counts/empty states after filtering.

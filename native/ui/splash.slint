@@ -3,14 +3,14 @@ import { SelectableText } from "selectable-text.slint";
 // The background picture is bundled at compile time.
 // Progress and status are genuine UI properties updated from Rust.
 export component SplashWindow inherits Window {
-    title: "ContainerSafe — Starting";
+    title: @tr("ContainerSafe — Starting");
     width: 1100px;
     height: 706px;
     background: #071526;
     default-font-family: "Segoe UI";
 
     in-out property <int> loading-progress: 0;
-    in-out property <string> loading-message: "Initializing ContainerSafe...";
+    in-out property <string> loading-message: @tr("Initializing ContainerSafe...");
 
     Image {
         x: 0px;
@@ -75,7 +75,7 @@ export component SplashWindow inherits Window {
             y: 65px;
             width: parent.width - 56px;
             height: 18px;
-            text: "Local startup checks only · No Docker changes performed";
+            text: @tr("Local startup checks only · No Docker changes performed");
             text-color: #809ab7;
             font-size: 11px;
             vertical-alignment: center;

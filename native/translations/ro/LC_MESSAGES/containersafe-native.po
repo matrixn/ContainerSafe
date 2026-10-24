@@ -1,0 +1,774 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ro\n"
+"Plural-Forms: nplurals=3; plural=(n == 1 ? 0 : (n == 0 || (n % 100 > 0 && n % 100 < 20)) ? 1 : 2);\n"
+
+msgid "Settings"
+msgstr "Setări"
+
+msgid "Make ContainerSafe yours"
+msgstr "Personalizează ContainerSafe"
+
+msgid "Preferences are saved automatically on this computer."
+msgstr "Preferințele se salvează automat pe acest calculator."
+
+msgid "Appearance and startup apply here. Connection defaults apply only to new server profiles. Backup selections are saved separately."
+msgstr "Personalizează interfața și pornirea. Valorile conexiunii se aplică doar profilurilor noi. Selecțiile de backup se salvează separat."
+
+msgid "Saved automatically"
+msgstr "Salvat automat"
+
+msgid "Could not save. Your previous setting is still active."
+msgstr "Salvarea nu a reușit. Setarea anterioară rămâne activă."
+
+msgid "Language"
+msgstr "Limbă"
+
+msgid "Choose the interface language. Changes apply immediately."
+msgstr "Alege limba interfeței. Modificarea se aplică imediat."
+
+msgid "Start page"
+msgstr "Pagina de pornire"
+
+msgid "Choose the workspace shown when ContainerSafe starts."
+msgstr "Alege pagina afișată la pornirea ContainerSafe."
+
+msgid "Initial source filter"
+msgstr "Filtrul inițial al surselor"
+
+msgid "Start with all sources, storage only, or databases only. You can change the filter in Containers."
+msgstr "Pornește cu toate sursele, doar stocare sau doar baze de date. Poți schimba filtrul în Containere."
+
+msgid "Default SSH port"
+msgstr "Portul SSH implicit"
+
+msgid "Used when adding a new server. Existing profiles keep their own port."
+msgstr "Folosit la adăugarea unui server. Profilurile existente își păstrează portul."
+
+msgid "Default connection timeout"
+msgstr "Timpul de așteptare implicit"
+
+msgid "Maximum wait for SSH network operations on new profiles. Existing profiles are unchanged."
+msgstr "Timpul maxim pentru operațiile de rețea SSH ale profilurilor noi. Profilurile existente nu se modifică."
+
+msgid "10 seconds"
+msgstr "10 secunde"
+
+msgid "30 seconds"
+msgstr "30 de secunde"
+
+msgid "60 seconds"
+msgstr "60 de secunde"
+
+msgid "120 seconds"
+msgstr "120 de secunde"
+
+msgid "Default Docker access"
+msgstr "Accesul Docker implicit"
+
+msgid "Automatic tries direct Docker, then passwordless sudo. Direct uses the SSH account. Sudo requires existing passwordless permissions."
+msgstr "Automat încearcă Docker direct, apoi sudo fără parolă. Direct folosește contul SSH. Sudo necesită permisiuni fără parolă deja configurate."
+
+msgid "Connect on startup"
+msgstr "Conectare la pornire"
+
+msgid "On: connect to your saved default server at launch. Off: open the workspace and connect manually through Servers. Host identity is always checked."
+msgstr "Activat: conectează serverul implicit la pornire. Dezactivat: deschide interfața și conectează manual din Servere. Identitatea serverului este verificată întotdeauna."
+
+msgid "On"
+msgstr "Activat"
+
+msgid "Off"
+msgstr "Dezactivat"
+
+msgid "Settings could not be loaded. The original file is preserved; editing is disabled."
+msgstr "Setările nu au putut fi încărcate. Fișierul original este păstrat; editarea este dezactivată."
+
+msgid "Could not save settings:"
+msgstr "Setările nu au putut fi salvate:"
+
+msgid "Select a container"
+msgstr "Selectează un container"
+
+msgid "Choose a stack on the left"
+msgstr "Alege un grup din stânga"
+
+msgid "Ready"
+msgstr "Pregătit"
+
+msgid "Not validated"
+msgstr "Nevalidat"
+
+msgid "Disconnected"
+msgstr "Deconectat"
+
+msgid "Not tested"
+msgstr "Netestat"
+
+msgid "File"
+msgstr "Fișier"
+
+msgid "New Server..."
+msgstr "Server nou..."
+
+msgid "Servers..."
+msgstr "Servere..."
+
+msgid "Quit"
+msgstr "Ieșire"
+
+msgid "Help"
+msgstr "Ajutor"
+
+msgid "Documentation"
+msgstr "Documentație"
+
+msgid "About ContainerSafe"
+msgstr "Despre ContainerSafe"
+
+msgid "Version "
+msgstr "Versiunea "
+
+msgid "WORKSPACE"
+msgstr "SPAȚIU DE LUCRU"
+
+msgid "Containers"
+msgstr "Containere"
+
+msgid "Backup plans"
+msgstr "Planuri de backup"
+
+msgid "Activity"
+msgstr "Activitate"
+
+msgid "Servers"
+msgstr "Servere"
+
+msgid "About"
+msgstr "Despre"
+
+msgid "Discovery & planning"
+msgstr "Descoperire și planificare"
+
+msgid "Refreshing…"
+msgstr "Se actualizează…"
+
+msgid "Refresh"
+msgstr "Actualizează"
+
+msgid "Save changes •"
+msgstr "Salvează modificările •"
+
+msgid "Save selections"
+msgstr "Salvează selecțiile"
+
+msgid "Validate"
+msgstr "Validează"
+
+msgid "Stacks & standalone"
+msgstr "Grupuri și independente"
+
+msgid "Storage sources"
+msgstr "Surse de stocare"
+
+msgid "Databases"
+msgstr "Baze de date"
+
+msgid "Container explorer"
+msgstr "Explorator de containere"
+
+msgid "Find a stack or container…"
+msgstr "Caută un grup sau container…"
+
+msgid "Connect a server to discover containers."
+msgstr "Conectează un server pentru a descoperi containerele."
+
+msgid "No matching containers."
+msgstr "Niciun container găsit."
+
+msgid "All sources"
+msgstr "Toate sursele"
+
+msgid "Storage"
+msgstr "Stocare"
+
+msgid "SOURCE & RECOVERY METHOD"
+msgstr "SURSĂ ȘI METODĂ DE RECUPERARE"
+
+msgid "BACKUP SELECTION"
+msgstr "SELECȚIE BACKUP"
+
+msgid "DB"
+msgstr "BD"
+
+msgid "DATA"
+msgstr "DATE"
+
+msgid "Backup unavailable: "
+msgstr "Backup indisponibil: "
+
+msgid "Backup options: "
+msgstr "Opțiuni de backup: "
+
+msgid "Choose a container or stack to review its storage."
+msgstr "Alege un container sau grup pentru a analiza stocarea."
+
+msgid "No persistent storage or database detected for this selection."
+msgstr "Nu s-a detectat stocare persistentă sau bază de date pentru această selecție."
+
+msgid "Selections prepare a backup plan. Production backup execution is not enabled."
+msgstr "Selecțiile pregătesc un plan de backup. Execuția backupurilor de producție nu este activată."
+
+msgid "Selected operations"
+msgstr "Operații selectate"
+
+msgid "No backup selected"
+msgstr "Fără backup selectat"
+
+msgid "Excluded items"
+msgstr "Elemente excluse"
+
+msgid "Eligible plans"
+msgstr "Planuri eligibile"
+
+msgid "Review your backup selections"
+msgstr "Verifică selecțiile de backup"
+
+msgid "Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate."
+msgstr "Sunt afișate doar grupurile și containerele cu o metodă de backup selectabilă. Verifică planul, salvează modificările, apoi validează."
+
+msgid "STACK / CONTAINER"
+msgstr "GRUP / CONTAINER"
+
+msgid "SELECTED"
+msgstr "SELECTATE"
+
+msgid "EXCLUDED"
+msgstr "EXCLUSE"
+
+msgid "NO BACKUP"
+msgstr "FĂRĂ BACKUP"
+
+msgid " containers"
+msgstr " containere"
+
+msgid "Review"
+msgstr "Verifică"
+
+msgid "Connect a server and discover its containers first."
+msgstr "Conectează mai întâi un server și descoperă containerele."
+
+msgid "No selectable backup methods are available for the discovered containers. See Containers for source and database explanations."
+msgstr "Containerele descoperite nu au metode de backup selectabile. Consultă explicațiile din Containere pentru surse și baze de date."
+
+msgid "Planning only · No scheduled or production backups have been created."
+msgstr "Doar planificare · Nu au fost create backupuri programate sau de producție."
+
+msgid "No backup activity yet"
+msgstr "Încă nu există activitate de backup"
+
+msgid "Discover your containers, review storage and save your selections. Production scheduling is not enabled."
+msgstr "Descoperă containerele, verifică stocarea și salvează selecțiile. Programarea în producție nu este activată."
+
+msgid "Native Docker discovery and backup planning. Built with Rust + Slint."
+msgstr "Descoperire Docker și planificare de backup. Construit cu Rust + Slint."
+
+msgid "Remove server?"
+msgstr "Elimini serverul?"
+
+msgid "HOST KEY CHANGED — connection blocked"
+msgstr "CHEIA SERVERULUI S-A SCHIMBAT — conexiune blocată"
+
+msgid "Trust SSH host identity?"
+msgstr "Accepți identitatea serverului SSH?"
+
+msgid "Cancel / Reject"
+msgstr "Anulează / Respinge"
+
+msgid "Remove profile and credential"
+msgstr "Elimină profilul și datele de autentificare"
+
+msgid "Approve reviewed replacement"
+msgstr "Aprobă înlocuirea verificată"
+
+msgid "Trust this host"
+msgstr "Acceptă acest server"
+
+msgid "Native Docker backup readiness manager. Rust + Slint."
+msgstr "Manager pentru pregătirea backupurilor Docker. Rust + Slint."
+
+msgid "Close"
+msgstr "Închide"
+
+msgid "ContainerSafe — Starting"
+msgstr "ContainerSafe — Pornire"
+
+msgid "Initializing ContainerSafe..."
+msgstr "Se inițializează ContainerSafe..."
+
+msgid "Local startup checks only · No Docker changes performed"
+msgstr "Doar verificări locale la pornire · Nicio modificare Docker"
+
+msgid "Backup options"
+msgstr "Opțiuni de backup"
+
+msgid "Help: "
+msgstr "Ajutor: "
+
+msgid "Close help"
+msgstr "Închide ajutorul"
+
+msgid "Connect a Docker server"
+msgstr "Conectează un server Docker"
+
+msgid "Give it a name. Choose how to sign in. Test, then save."
+msgstr "Dă-i un nume. Alege autentificarea. Testează, apoi salvează."
+
+msgid "1   Connection"
+msgstr "1   Conexiune"
+
+msgid "2   Sign-in"
+msgstr "2   Autentificare"
+
+msgid "3   Docker & test"
+msgstr "3   Docker și test"
+
+msgid "Where is your server?"
+msgstr "Unde este serverul?"
+
+msgid "Server name"
+msgstr "Numele serverului"
+
+msgid "A friendly name shown only in ContainerSafe, such as Home NAS or Production Docker. It does not rename the remote computer."
+msgstr "Un nume afișat doar în ContainerSafe, de exemplu NAS acasă sau Docker producție. Nu redenumește calculatorul la distanță."
+
+msgid "e.g. Home NAS"
+msgstr "de exemplu NAS acasă"
+
+msgid "Hostname or IP address"
+msgstr "Nume gazdă sau adresă IP"
+
+msgid "The address of the computer running Docker, for example nas.local or 192.168.1.20. Enter only the hostname or IP, without https://, an SSH username, port or folder path."
+msgstr "Adresa calculatorului care rulează Docker, de exemplu nas.local sau 192.168.1.20. Introdu doar numele sau IP-ul, fără https://, utilizator SSH, port sau cale."
+
+msgid "e.g. nas.local or 192.168.1.20"
+msgstr "de exemplu nas.local sau 192.168.1.20"
+
+msgid "SSH port"
+msgstr "Port SSH"
+
+msgid "The port used by the server's SSH service. Usually 22. Change it only if your SSH service or port forwarding uses another port. Valid range: 1-65535."
+msgstr "Portul serviciului SSH. De obicei 22. Modifică-l doar dacă SSH sau redirecționarea folosește alt port. Interval: 1-65535."
+
+msgid "Use the same address and port you would use in PuTTY or an SSH terminal."
+msgstr "Folosește aceeași adresă și același port ca în PuTTY sau terminalul SSH."
+
+msgid "SSH must already be enabled on this server. ContainerSafe will ask you to review its identity before signing in for the first time."
+msgstr "SSH trebuie activat pe server. ContainerSafe îți cere să verifici identitatea înainte de prima autentificare."
+
+msgid "SSH username"
+msgstr "Utilizator SSH"
+
+msgid "An existing login account on the remote server, such as your NAS user. This is not your Docker Hub account. The account must be allowed to use SSH and access Docker."
+msgstr "Un cont existent pe server, de exemplu utilizatorul NAS. Nu este contul Docker Hub. Contul trebuie să aibă acces SSH și Docker."
+
+msgid "Your remote server account"
+msgstr "Contul tău de pe server"
+
+msgid "How do you sign in?"
+msgstr "Cum te autentifici?"
+
+msgid "Password: use your remote account password. OpenSSH key: use a private key file stored on this computer; its public key must be installed on the server. PuTTY (.ppk): follow the export guide to convert your key to supported OpenSSH format first."
+msgstr "Parolă: parola contului de pe server. Cheie OpenSSH: fișierul privat de pe acest calculator; cheia publică trebuie instalată pe server. PuTTY (.ppk): urmează mai întâi ghidul de export OpenSSH."
+
+msgid "Account password"
+msgstr "Parola contului"
+
+msgid "PuTTY key (.ppk) - export guide"
+msgstr "Cheie PuTTY (.ppk) - ghid de export"
+
+msgid "OpenSSH private key"
+msgstr "Cheie privată OpenSSH"
+
+msgid "Password login uses the password of your SSH account on the remote server."
+msgstr "Autentificarea cu parolă folosește parola contului SSH de pe server."
+
+msgid "Private key file"
+msgstr "Fișierul cheii private"
+
+msgid "Choose your private OpenSSH key on this computer, not its .pub public-key file. The matching public key must be in the remote user's authorized_keys. Your private key file is not uploaded to the server."
+msgstr "Alege cheia privată OpenSSH, nu fișierul public .pub. Cheia publică trebuie să fie în authorized_keys pe server. Fișierul privat nu este încărcat pe server."
+
+msgid "Choose a private key on this computer"
+msgstr "Alege o cheie privată de pe acest calculator"
+
+msgid "Browse..."
+msgstr "Răsfoiește..."
+
+msgid "Choose your existing private key file. No file is uploaded."
+msgstr "Alege fișierul existent al cheii private. Niciun fișier nu este încărcat."
+
+msgid "Use my exported OpenSSH key"
+msgstr "Folosește cheia OpenSSH exportată"
+
+msgid "Key passphrase (optional)"
+msgstr "Parola cheii (opțional)"
+
+msgid "The password for the SSH username above. It is sent only through the encrypted SSH connection after you approve the server identity. It is not your Windows password unless both accounts happen to use the same password."
+msgstr "Parola utilizatorului SSH de mai sus. Este trimisă doar prin conexiunea criptată, după aprobarea identității serverului. Nu este parola Windows decât dacă ambele conturi folosesc aceeași parolă."
+
+msgid "The password that unlocks this private key file, which can differ from your server account password. Leave blank only if the key is not encrypted."
+msgstr "Parola care deblochează cheia privată, posibil diferită de parola contului. Lasă gol doar dacă cheia nu este criptată."
+
+msgid "Remember on this computer"
+msgstr "Memorează pe acest calculator"
+
+msgid "Enabled: store the password or key passphrase in the operating-system credential store. Disabled: keep it only for this app session; you must enter it again next time. The profile itself never contains the password. A private key file stays where you selected it."
+msgstr "Activat: salvează parola în managerul de acreditări al sistemului. Dezactivat: o păstrează doar în sesiunea curentă; o vei introduce din nou data viitoare. Profilul nu conține niciodată parola. Cheia privată rămâne în locația aleasă."
+
+msgid "Check access before saving"
+msgstr "Verifică accesul înainte de salvare"
+
+msgid "Docker access"
+msgstr "Acces Docker"
+
+msgid "Automatic: try Docker directly, then passwordless sudo if needed. Direct Docker CLI: run Docker as the SSH user, usually with Docker group permissions. Passwordless sudo -n: run Docker through sudo without prompting; the server must already allow this. Your SSH password is never used as a sudo password."
+msgstr "Automat: încearcă Docker direct, apoi sudo fără parolă. Docker direct: rulează cu utilizatorul SSH, de obicei cu permisiunile grupului Docker. sudo -n: rulează prin sudo fără solicitarea parolei; serverul trebuie să permită deja asta. Parola SSH nu este folosită pentru sudo."
+
+msgid "Automatic (recommended)"
+msgstr "Automat (recomandat)"
+
+msgid "Direct Docker CLI"
+msgstr "Docker CLI direct"
+
+msgid "Passwordless sudo -n"
+msgstr "sudo -n fără parolă"
+
+msgid "Automatic tries direct access first, then passwordless sudo. A good starting point if you are unsure."
+msgstr "Încearcă accesul direct, apoi sudo fără parolă. Recomandat dacă nu ești sigur."
+
+msgid "Use the SSH user's existing Docker permissions. No sudo is attempted."
+msgstr "Folosește permisiunile Docker ale utilizatorului SSH. Nu încearcă sudo."
+
+msgid "Use existing passwordless sudo permissions. ContainerSafe cannot answer a sudo password prompt or grant permissions."
+msgstr "Folosește permisiunile sudo fără parolă existente. ContainerSafe nu poate introduce parola sudo sau acorda permisiuni."
+
+msgid "Connection timeout (seconds)"
+msgstr "Timp de așteptare (secunde)"
+
+msgid "How long SSH network operations may wait before reporting a timeout. Default: 10 seconds. Increase for a slow or distant server. Valid range: 1-120 seconds. This does not schedule backups."
+msgstr "Cât așteaptă operațiile SSH înainte de expirare. Implicit: 10 secunde. Mărește pentru un server lent sau îndepărtat. Interval: 1-120 secunde. Nu programează backupuri."
+
+msgid "Connection verified"
+msgstr "Conexiune verificată"
+
+msgid "Connection check"
+msgstr "Verificarea conexiunii"
+
+msgid "Test checks SSH connectivity, server identity, authentication and Docker access, then reads the container inventory. Save becomes available only after a successful test. Changing a field requires a new test. This does not run a backup."
+msgstr "Testul verifică SSH, identitatea, autentificarea și accesul Docker, apoi citește containerele. Salvarea devine disponibilă doar după succes. Modificarea unui câmp necesită retestare. Nu rulează un backup."
+
+msgid "Copy report"
+msgstr "Copiază raportul"
+
+msgid "Checking your server..."
+msgstr "Se verifică serverul..."
+
+msgid "Verified. You can now save this server."
+msgstr "Verificat. Acum poți salva serverul."
+
+msgid "Save unlocks after a successful connection test."
+msgstr "Salvarea se activează după testarea cu succes a conexiunii."
+
+msgid "Cancel"
+msgstr "Anulează"
+
+msgid "Back"
+msgstr "Înapoi"
+
+msgid "Continue"
+msgstr "Continuă"
+
+msgid "Testing..."
+msgstr "Se testează..."
+
+msgid "Test connection"
+msgstr "Testează conexiunea"
+
+msgid "Save server"
+msgstr "Salvează serverul"
+
+msgid "Save this profile after a successful connection test. Changes require testing again."
+msgstr "Salvează profilul după testarea cu succes. Modificările necesită retestare."
+
+msgid "Name"
+msgstr "Nume"
+
+msgid "Host"
+msgstr "Gazdă"
+
+msgid "Status"
+msgstr "Stare"
+
+msgid "Last opened"
+msgstr "Ultima deschidere"
+
+msgid "★ = Default server. Opening a server preserves the default preference."
+msgstr "★ = Server implicit. Deschiderea altui server păstrează această preferință."
+
+msgid "New"
+msgstr "Nou"
+
+msgid "Edit"
+msgstr "Editează"
+
+msgid "Remove"
+msgstr "Elimină"
+
+msgid "Set Default"
+msgstr "Setează implicit"
+
+msgid "Open"
+msgstr "Deschide"
+
+msgid "No backup"
+msgstr "Fără backup"
+
+msgid "Include"
+msgstr "Include"
+
+msgid "Exclude"
+msgstr "Exclude"
+
+msgid "Logical dump"
+msgstr "Export logic"
+
+msgid "No server connected"
+msgstr "Niciun server conectat"
+
+msgid "No containers detected"
+msgstr "Niciun container detectat"
+
+msgid "Selection not verified for execution"
+msgstr "Selecție neverificată pentru execuție"
+
+msgid "Unsaved selection changes"
+msgstr "Modificări nesalvate ale selecției"
+
+msgid "Selections saved"
+msgstr "Selecții salvate"
+
+msgid "Validation needed"
+msgstr "Validare necesară"
+
+msgid "Connected"
+msgstr "Conectat"
+
+msgid "Never"
+msgstr "Niciodată"
+
+msgid "Already using PuTTY? Export your key once\n\n1. Open the .ppk file in PuTTYgen.\n2. Keep a passphrase and choose Conversions > Export OpenSSH key.\n3. Save the exported private key on this computer.\n4. Choose OpenSSH below and browse to that exported file.\n\nPPK files cannot be used directly. Your original key is unchanged.\n\n"
+msgstr "Folosești deja PuTTY? Exportă cheia o singură dată\n\n1. Deschide fișierul .ppk în PuTTYgen.\n2. Păstrează o parolă și alege Conversions > Export OpenSSH key.\n3. Salvează cheia privată exportată pe acest calculator.\n4. Alege OpenSSH mai jos și selectează fișierul exportat.\n\nFișierele PPK nu pot fi folosite direct. Cheia originală rămâne neschimbată.\n\n"
+
+msgid "Connect a Docker server from File > New Server or Servers"
+msgstr "Conectează un server Docker din Fișier > Server nou sau Servere"
+
+msgid "Refresh to query the selected server"
+msgstr "Actualizează pentru a interoga serverul selectat"
+
+msgid "Backup execution is disabled"
+msgstr "Execuția backupurilor este dezactivată"
+
+msgid "Standalone container"
+msgstr "Container independent"
+
+msgid "Standalone"
+msgstr "Independent"
+
+msgid "Raw DB backup prohibited · select DB logical dump"
+msgstr "Copierea fișierelor BD este interzisă · selectează export logic BD"
+
+msgid "Persistent state requires manual review"
+msgstr "Starea persistentă necesită verificare manuală"
+
+msgid "Large storage · explicit opt-in"
+msgstr "Stocare mare · necesită includere explicită"
+
+msgid "Candidate persistent source · review before backup"
+msgstr "Sursă persistentă posibilă · verifică înainte de backup"
+
+msgid "Loading server configuration..."
+msgstr "Se încarcă configurația serverelor..."
+
+msgid "Disconnected - select a Docker server"
+msgstr "Deconectat - selectează un server Docker"
+
+msgid "Preparing disconnected workspace..."
+msgstr "Se pregătește spațiul de lucru..."
+
+msgid "Starting ContainerSafe..."
+msgstr "Se pornește ContainerSafe..."
+
+msgid "Complete"
+msgstr "Finalizat"
+
+msgid "Saved; requires validation"
+msgstr "Salvat; necesită validare"
+
+msgid "Save changes before validation"
+msgstr "Salvează modificările înainte de validare"
+
+msgid "Validating selection with existing Rust CLI..."
+msgstr "Se validează selecția cu instrumentul Rust existent..."
+
+msgid "Selection valid · no backup authorized"
+msgstr "Selecție validă · niciun backup autorizat"
+
+msgid "Needs review"
+msgstr "Necesită verificare"
+
+msgid "Last success"
+msgstr "Ultimul succes"
+
+msgid "SSH port must be between 1 and 65535"
+msgstr "Portul SSH trebuie să fie între 1 și 65535"
+
+msgid "Timeout must be 1-120 seconds"
+msgstr "Timpul de așteptare trebuie să fie între 1 și 120 de secunde"
+
+msgid "Password required"
+msgstr "Parola este obligatorie"
+
+msgid "Cannot build plan"
+msgstr "Planul nu poate fi construit"
+
+msgid "Cannot read plan"
+msgstr "Planul nu poate fi citit"
+
+msgid "Workspace state unavailable"
+msgstr "Starea spațiului de lucru nu este disponibilă"
+
+msgid "Plan changed; validation required"
+msgstr "Plan modificat; necesită validare"
+
+msgid "Connecting to SSH; checking identity, authentication and Docker..."
+msgstr "Conectare SSH; se verifică identitatea, autentificarea și Docker..."
+
+msgid "Save selections and wait for active work before switching servers"
+msgstr "Salvează selecțiile și așteaptă terminarea operațiilor înainte de schimbarea serverului"
+
+msgid "Connecting to selected server..."
+msgstr "Se conectează serverul selectat..."
+
+msgid "Enter this server's session password, then Test Connection"
+msgstr "Introdu parola sesiunii pentru acest server, apoi testează conexiunea"
+
+msgid "Changed — test this configuration again"
+msgstr "Modificat — testează din nou configurația"
+
+msgid "Select SSH private key"
+msgstr "Selectează cheia privată SSH"
+
+msgid "Disconnected — File > New Server or Servers"
+msgstr "Deconectat — Fișier > Server nou sau Servere"
+
+msgid "Configuration is damaged; repair servers.json before making changes. Original file preserved."
+msgstr "Configurația este deteriorată; repară servers.json înainte de modificări. Fișierul original este păstrat."
+
+msgid "Save backup selections before editing server profiles"
+msgstr "Salvează selecțiile de backup înainte de editarea profilurilor"
+
+msgid "Save selections before removing a server"
+msgstr "Salvează selecțiile înainte de eliminarea serverului"
+
+msgid "No backup: no method selected. This item is not approved for backup and still needs review before validation."
+msgstr "Fără backup: nicio metodă selectată. Elementul nu este aprobat pentru backup și necesită verificare înainte de validare."
+
+msgid "Include: explicitly add this large storage source to the plan. Review its size and destination capacity first. This does not start a backup."
+msgstr "Include: adaugă explicit sursa mare în plan. Verifică mai întâi dimensiunea și capacitatea destinației. Nu pornește un backup."
+
+msgid "Include: add this persistent file source to the backup plan. This does not start a backup."
+msgstr "Include: adaugă sursa de fișiere persistente în plan. Nu pornește un backup."
+
+msgid "Logical dump: plan a consistent PostgreSQL database export instead of copying live database files. This saves the intended strategy; execution of the database adapter is not implemented yet."
+msgstr "Export logic: planifică un export coerent PostgreSQL în locul copierii fișierelor bazei active. Salvează strategia; execuția adaptorului nu este încă implementată."
+
+msgid "Exclude: explicitly omit this item from the plan and mark the skip as reviewed. Unlike No backup, this is a deliberate selection decision."
+msgstr "Exclude: omite explicit elementul din plan și marchează excluderea ca verificată. Spre deosebire de Fără backup, este o decizie explicită."
+
+msgid "Redis/Valkey backup is unavailable: a verified persistence backup adapter has not been implemented. Its live database files must not be copied as a generic file backup. No backup leaves this item unreviewed; Exclude records an explicit decision to skip it."
+msgstr "Backupul Redis/Valkey este indisponibil: adaptorul verificat de persistență nu este implementat. Fișierele bazei active nu trebuie copiate ca fișiere obișnuite. Fără backup lasă elementul neverificat; Exclude înregistrează omiterea explicită."
+
+msgid "This database needs a consistent logical dump. A selectable MySQL/MariaDB dump adapter is not implemented in this build. Copying the live database directory is prohibited. No backup leaves it unreviewed; Exclude explicitly skips it."
+msgstr "Această bază necesită un export logic coerent. Adaptorul selectabil MySQL/MariaDB nu este implementat. Copierea directorului bazei active este interzisă. Fără backup lasă elementul neverificat; Exclude îl omite explicit."
+
+msgid "No selectable backup adapter is implemented for this database engine. A generic file copy is not a replacement for a consistent database backup. No backup leaves it unreviewed; Exclude explicitly skips it."
+msgstr "Nu există adaptor de backup selectabil pentru acest motor. Copierea fișierelor nu înlocuiește un backup coerent al bazei. Fără backup lasă elementul neverificat; Exclude îl omite explicit."
+
+msgid "This path contains live database files. Include is unavailable because copying them directly can produce an inconsistent backup. Review the database entry and select Logical dump if offered. Otherwise a suitable database adapter is still required."
+msgstr "Calea conține fișierele unei baze active. Includerea este indisponibilă deoarece copierea directă poate produce un backup inconsistent. Verifică baza și selectează Export logic dacă este oferit. Altfel este necesar un adaptor potrivit."
+
+msgid "This source requires a verified persistence strategy. Generic file backup is unavailable until that strategy has been implemented and reviewed. No backup leaves it unreviewed; Exclude explicitly skips it."
+msgstr "Sursa necesită o strategie verificată de persistență. Backupul obișnuit de fișiere este indisponibil până la implementarea și verificarea strategiei. Fără backup lasă elementul neverificat; Exclude îl omite explicit."
+
+msgid "{0} · {1} containers · {2} storage sources · {3} databases"
+msgstr "{0} · {1} containere · {2} surse de stocare · {3} baze de date"
+
+msgid "Compose / {0} · project-wide storage"
+msgstr "Compose / {0} · stocare la nivel de proiect"
+
+msgid "{0} items need recovery review · no backup created"
+msgstr "{0} elemente necesită verificarea recuperării · niciun backup creat"
+
+msgid "Adapter: {0} · not executable yet"
+msgstr "Adaptor: {0} · execuția nu este disponibilă încă"
+
+msgid "Selection saved · {0} selected operations · {1} with no backup selected"
+msgstr "Selecție salvată · {0} operații selectate · {1} fără backup selectat"
+
+msgid "SSH uses russh with ring, without OpenSSL. Ed25519, ECDSA and RSA OpenSSH/PEM/PKCS#8 keys are supported, including compatible encrypted keys. Legacy PEM encryption supports AES-128-CBC and AES-256-CBC; other ciphers are reported explicitly. PPK requires manual encrypted OpenSSH export. Key files are never converted or changed. Host certificates and hardware security-key workflows are not supported by this interface."
+msgstr "SSH folosește russh cu ring, fără OpenSSL. Sunt acceptate chei Ed25519, ECDSA și RSA în format OpenSSH/PEM/PKCS#8, inclusiv chei criptate compatibile. Criptarea PEM veche acceptă AES-128-CBC și AES-256-CBC; celelalte cifruri sunt raportate explicit. PPK necesită export manual OpenSSH criptat. Fișierele cheilor nu sunt convertite sau modificate. Certificatele de gazdă și cheile hardware nu sunt acceptate de această interfață."
+
+msgid "Unknown"
+msgstr "Necunoscut"
+
+msgid "Failed"
+msgstr "Eșuat"
+
+msgid "Connecting"
+msgstr "Se conectează"
+
+msgid "Verified"
+msgstr "Verificat"
+
+msgid "SSH: Connected\nHost identity: Verified\nAuthentication: Successful\nDocker: Available\nEngine: {0}\nPermissions: Granted\nContainers detected: {1}\nServer ready to save."
+msgstr "SSH: Conectat\nIdentitatea serverului: Verificată\nAutentificare: Reușită\nDocker: Disponibil\nMotor: {0}\nPermisiuni: Acordate\nContainere detectate: {1}\nServerul poate fi salvat."
+
+msgid "\nPreviously trusted: {0}"
+msgstr "\nIdentitate acceptată anterior: {0}"
+
+msgid "Host: {0}\nKey type: {1}\nFingerprint: {2}{3}\n\nVerify this fingerprint through a trusted channel before approval. Credentials have not been sent."
+msgstr "Gazdă: {0}\nTip cheie: {1}\nAmprentă: {2}{3}\n\nVerifică amprenta printr-un canal de încredere înainte de aprobare. Datele de autentificare nu au fost trimise."
+
+msgid "Offline"
+msgstr "Deconectat"
+
+msgid "Connecting: {0}"
+msgstr "Se conectează: {0}"
+
+msgid "Connection failed: {0}. Retry, edit this server, or File > Servers."
+msgstr "Conexiunea a eșuat: {0}. Reîncearcă, editează serverul sau deschide Fișier > Servere."
+
+msgid "Open failed: {0}"
+msgstr "Deschiderea a eșuat: {0}"
+
+msgid "Profile saved, but opening failed: {0}"
+msgstr "Profil salvat, dar deschiderea a eșuat: {0}"
+
+msgid "Connected to {0} · save reconciled backup selections"
+msgstr "Conectat la {0} · salvează selecțiile de backup reconciliate"
+
+msgid "Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact."
+msgstr "Elimini {0} ({1}) și datele sale de autentificare memorate? Datele de pe server și fișierele cheilor private rămân intacte."
+

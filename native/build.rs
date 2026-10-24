@@ -1,6 +1,12 @@
 fn main() {
     // Compileaza interfata Slint.
-    slint_build::compile("ui/main.slint").expect("Slint UI compilation failed");
+    slint_build::compile_with_config(
+        "ui/main.slint",
+        slint_build::CompilerConfiguration::new()
+            .with_bundled_translations("translations")
+            .with_default_translation_context(slint_build::DefaultTranslationContext::None),
+    )
+    .expect("Slint UI compilation failed");
 
     // Adauga iconita in executabilul Windows.
     #[cfg(target_os = "windows")]

@@ -93,7 +93,7 @@ export component ToggleCheck inherits Rectangle {
 }
 
 export component InfoButton inherits Rectangle {
-    in property <string> label: "Backup options";
+    in property <string> label: @tr("Backup options");
     in property <string> help;
     in property <bool> warning: false;
     width: 20px; height: 20px;
@@ -113,7 +113,7 @@ export component InfoButton inherits Rectangle {
             VerticalLayout { padding: 16px; spacing: 12px;
                 SelectableText { text: root.label; text-color: Theme.ink; font-size: 14px; font-weight: 650; wrap: word-wrap; }
                 SelectableText { text: root.help; text-color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-                ActionButton { text: "Close"; clicked => { help-popup.close(); } }
+                ActionButton { text: @tr("Close"); clicked => { help-popup.close(); } }
             }
         }
     }

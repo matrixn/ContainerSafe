@@ -1,10 +1,11 @@
 import { SelectableText } from "selectable-text.slint";
-import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton } from "theme.slint";
+import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton, ToggleCheck } from "theme.slint";
 export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
 export { ServerRow } from "dialogs/server-manager.slint";
 import { ListView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
+export struct PreferenceEntry { title: string, description: string, options: [string], choice: int, state: int }
 export struct TreeEntry { key: string, name: string, note: string, depth: int, branch: bool, expanded: bool, selected: bool, app-index: int, container: string }
 export struct PlanEntry { name: string, kind: string, containers: int, selected: int, excluded: int, pending: int, app-index: int }
 export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int, has-method: bool, option-help: string, unavailable-help: string }
@@ -69,11 +70,11 @@ export component ContainerSafeWindow inherits Window {
     callback choose-decision(int, int);
     callback filter-entries();
     in-out property <int> active-index: -1;
-    in-out property <string> selected-name: "Select a container";
-    in-out property <string> selected-summary: "Choose a stack on the left";
+    in-out property <string> selected-name: @tr("Select a container");
+    in-out property <string> selected-summary: @tr("Choose a stack on the left");
     in-out property <string> selected-warning: "";
-    in-out property <string> status-message: "Ready";
-    in-out property <string> validation-message: "Not validated";
+    in-out property <string> status-message: @tr("Ready");
+    in-out property <string> validation-message: @tr("Not validated");
     in-out property <int> total-apps: 0;
     in-out property <int> total-containers: 0;
     in-out property <int> total-sources: 0;
@@ -91,7 +92,7 @@ export component ContainerSafeWindow inherits Window {
 
     in-out property <string> app-version;
     in property <string> ssh-key-compatibility;
-    in-out property <string> active-server: "Disconnected";
+    in-out property <string> active-server: @tr("Disconnected");
     in-out property <int> dialog: 0;
     in-out property <[ServerRow]> servers;
     in-out property <int> selected-server: -1;
@@ -105,7 +106,7 @@ export component ContainerSafeWindow inherits Window {
     in-out property <bool> form-remember;
     in-out property <int> form-docker;
     in-out property <string> form-timeout: "10";
-    in-out property <string> connection-result: "Not tested";
+    in-out property <string> connection-result: @tr("Not tested");
     in-out property <bool> test-busy;
     in-out property <bool> test-passed;
     in-out property <string> host-question;
@@ -118,16 +119,22 @@ export component ContainerSafeWindow inherits Window {
     callback trust-host();
 
 
+    in-out property <[PreferenceEntry]> preferences;
+    in-out property <string> settings-error;
+    in-out property <bool> settings-editable: true;
+    callback preference-changed(int, int);
+
     MenuBar {
-        Menu { title: "File";
-            MenuItem { title: "New Server..."; shortcut: @keys(Control + N); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("new"); } }
-            MenuItem { title: "Servers..."; shortcut: @keys(Control + Shift + S); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("servers"); } }
+        Menu { title: @tr("File");
+            MenuItem { title: @tr("New Server..."); shortcut: @keys(Control + N); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("new"); } }
+            MenuItem { title: @tr("Servers..."); shortcut: @keys(Control + Shift + S); enabled: root.dialog == 0 && !root.loading; activated => { root.server-action("servers"); } }
+            MenuItem { title: @tr("Settings"); enabled: root.dialog == 0; activated => { root.page = 4; } }
             MenuSeparator {}
-            MenuItem { title: "Quit"; shortcut: @keys(Control + Q); activated => { root.server-action("quit"); } }
+            MenuItem { title: @tr("Quit"); shortcut: @keys(Control + Q); activated => { root.server-action("quit"); } }
         }
-        Menu { title: "Help";
-            MenuItem { title: "Documentation"; activated => { root.server-action("docs"); } }
-            MenuItem { title: "About ContainerSafe"; activated => { root.dialog = 4; } }
+        Menu { title: @tr("Help");
+            MenuItem { title: @tr("Documentation"); activated => { root.server-action("docs"); } }
+            MenuItem { title: @tr("About ContainerSafe"); activated => { root.dialog = 4; } }
         }
     }
 
@@ -141,48 +148,73 @@ export component ContainerSafeWindow inherits Window {
                     Image { width: 34px; height: 34px; source: @image-url("../assets/icons/containersafe.png"); image-fit: contain; }
                     VerticalLayout { spacing: 4px; alignment: center;
                         SelectableText { text: "ContainerSafe"; text-color: Theme.ink; font-size: 14px; font-weight: 750; }
-                        SelectableText { text: "Version " + root.app-version; text-color: Theme.muted; font-size: 11px; }
+                        SelectableText { text: @tr("Version ") + root.app-version; text-color: Theme.muted; font-size: 11px; }
                     }
                 }
-                SelectableText { height: 32px; text: "WORKSPACE"; text-color: #8b9aac; font-size: 10px; font-weight: 650; vertical-alignment: center; }
-                NavLine { label: "Containers"; active: root.page == 0; pressed => { root.page = 0; } }
-                NavLine { label: "Backup plans"; active: root.page == 1; pressed => { root.page = 1; } }
-                NavLine { label: "Activity"; active: root.page == 2; pressed => { root.page = 2; } }
+                SelectableText { height: 32px; text: @tr("WORKSPACE"); text-color: #8b9aac; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                NavLine { label: @tr("Containers"); active: root.page == 0; pressed => { root.page = 0; } }
+                NavLine { label: @tr("Backup plans"); active: root.page == 1; pressed => { root.page = 1; } }
+                NavLine { label: @tr("Activity"); active: root.page == 2; pressed => { root.page = 2; } }
                 Rectangle { vertical-stretch: 1; }
                 Rectangle { height: 1px; background: Theme.line; }
-                NavLine { label: "Servers"; pressed => { root.server-action("servers"); } }
-                NavLine { label: "About"; active: root.page == 3; pressed => { root.page = 3; } }
-                SelectableText { height: 34px; text: "Discovery & planning"; font-size: 10px; text-color: #8b9aac; vertical-alignment: center; }
+                NavLine { label: @tr("Servers"); pressed => { root.server-action("servers"); } }
+                NavLine { label: @tr("Settings"); active: root.page == 4; pressed => { root.page = 4; } }
+                NavLine { label: @tr("About"); active: root.page == 3; pressed => { root.page = 3; } }
+                SelectableText { height: 34px; text: @tr("Discovery & planning"); font-size: 10px; text-color: #8b9aac; vertical-alignment: center; }
             }
         }
         VerticalLayout { spacing: 0px;
             Rectangle { height: 86px; background: white;
                 HorizontalLayout { padding-left: 26px; padding-right: 26px; spacing: 10px;
                     VerticalLayout { alignment: center; spacing: 5px; horizontal-stretch: 1;
-                        SelectableText { text: root.page == 3 ? "About ContainerSafe" : root.page == 2 ? "Activity" : root.page == 1 ? "Backup plans" : "Containers"; font-size: 25px; font-weight: 700; text-color: Theme.ink; }
-                        SelectableText { text: root.active-server; text-color: Theme.muted; font-size: 12px; overflow: elide; }
+                        SelectableText { text: root.page == 4 ? @tr("Settings") : root.page == 3 ? @tr("About ContainerSafe") : root.page == 2 ? @tr("Activity") : root.page == 1 ? @tr("Backup plans") : @tr("Containers"); font-size: 25px; font-weight: 700; text-color: Theme.ink; }
+                        SelectableText { text: root.page == 4 ? @tr("Preferences are saved automatically on this computer.") : root.active-server; text-color: Theme.muted; font-size: 12px; overflow: elide; }
                     }
-                    VerticalLayout { alignment: center; Button { text: root.loading ? "Refreshing…" : "Refresh"; enabled: !root.loading; clicked => { root.refresh-inventory(); } } }
-                    VerticalLayout { alignment: center; Button { text: root.dirty ? "Save changes •" : "Save selections"; enabled: !root.loading && root.dirty; primary: true; clicked => { root.save-selection(); } } }
-                    VerticalLayout { alignment: center; Button { text: "Validate"; enabled: !root.loading && root.total-apps > 0; clicked => { root.validate-selection(); } } }
+                    VerticalLayout { visible: root.page != 4; alignment: center; Button { text: root.loading ? @tr("Refreshing…") : @tr("Refresh"); enabled: !root.loading; clicked => { root.refresh-inventory(); } } }
+                    VerticalLayout { visible: root.page != 4; alignment: center; Button { text: root.dirty ? @tr("Save changes •") : @tr("Save selections"); enabled: !root.loading && root.dirty; primary: true; clicked => { root.save-selection(); } } }
+                    VerticalLayout { visible: root.page != 4; alignment: center; Button { text: @tr("Validate"); enabled: !root.loading && root.total-apps > 0; clicked => { root.validate-selection(); } } }
+                }
+            }
+            if root.page == 4 : VerticalLayout {
+                padding: 24px; spacing: 14px;
+                SelectableText { text: @tr("Make ContainerSafe yours"); font-size: 20px; font-weight: 700; text-color: Theme.ink; }
+                SelectableText { text: @tr("Appearance and startup apply here. Connection defaults apply only to new server profiles. Backup selections are saved separately."); text-color: Theme.muted; wrap: word-wrap; }
+                if root.settings-error != "" : SelectableText { text: root.settings-error; text-color: #a34431; wrap: word-wrap; }
+                ListView {
+                    for setting[index] in root.preferences: Rectangle {
+                        height: 132px;
+                        Rectangle { y: 6px; height: 120px; width: parent.width; background: white; border-radius: 8px; border-width: 1px; border-color: Theme.line;
+                        HorizontalLayout { padding: 18px; spacing: 24px;
+                            VerticalLayout { spacing: 5px; horizontal-stretch: 1;
+                                SelectableText { text: setting.title; font-size: 14px; font-weight: 650; text-color: Theme.ink; }
+                                SelectableText { text: setting.description; wrap: word-wrap; text-color: Theme.muted; font-size: 12px; }
+                                SelectableText { text: setting.state == 1 ? @tr("Saved automatically") : setting.state == 2 ? @tr("Could not save. Your previous setting is still active.") : ""; text-color: setting.state == 2 ? #a34431 : #39765c; font-size: 11px; }
+                            }
+                            VerticalLayout { alignment: center; width: 260px;
+                                if index != 6 : ComboBox { model: setting.options; current-index: setting.choice; enabled: root.settings-editable; selected(value) => { root.preference-changed(index, self.current-index); } }
+                                if index == 6 : ToggleCheck { text: setting.choice == 1 ? @tr("On") : @tr("Off"); checked: setting.choice == 1; enabled: root.settings-editable; toggled => { root.preference-changed(index, self.checked ? 1 : 0); } }
+                            }
+                        }
+                        }
+                    }
                 }
             }
             if root.page == 0 : VerticalLayout {
                 padding: 22px; spacing: 18px;
                 HorizontalLayout { spacing: 12px;
-                    Metric { label: "Containers"; value: root.total-containers; }
-                    Metric { label: "Stacks & standalone"; value: root.total-apps; tint: #6083b5; }
-                    Metric { label: "Storage sources"; value: root.total-sources; tint: #6a9a86; }
-                    Metric { label: "Databases"; value: root.total-dbs; tint: #9880b4; }
+                    Metric { label: @tr("Containers"); value: root.total-containers; }
+                    Metric { label: @tr("Stacks & standalone"); value: root.total-apps; tint: #6083b5; }
+                    Metric { label: @tr("Storage sources"); value: root.total-sources; tint: #6a9a86; }
+                    Metric { label: @tr("Databases"); value: root.total-dbs; tint: #9880b4; }
                 }
                 HorizontalLayout { spacing: 18px; vertical-stretch: 1;
                     Rectangle { width: 306px; background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line;
                         VerticalLayout { padding: 12px; spacing: 10px;
                             HorizontalLayout { height: 28px; padding-left: 6px;
-                                SelectableText { text: "Container explorer"; text-color: Theme.ink; font-weight: 650; font-size: 14px; vertical-alignment: center; }
+                                SelectableText { text: @tr("Container explorer"); text-color: Theme.ink; font-weight: 650; font-size: 14px; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
                             }
-                            LineEdit { text <=> root.filter-text; placeholder-text: "Find a stack or container…"; edited => { root.filter-changed(); } }
+                            LineEdit { text <=> root.filter-text; placeholder-text: @tr("Find a stack or container…"); edited => { root.filter-changed(); } }
                             ListView {
                                 for item in root.tree-model: TreeLine {
                                     entry: item;
@@ -190,7 +222,7 @@ export component ContainerSafeWindow inherits Window {
                                     toggled => { root.toggle-node(item.key); }
                                 }
                             }
-                            if root.tree-model.length == 0 : SelectableText { height: 54px; text: root.filter-text == "" ? "Connect a server to discover containers." : "No matching containers."; wrap: word-wrap; text-color: Theme.muted; font-size: 12px; }
+                            if root.tree-model.length == 0 : SelectableText { height: 54px; text: root.filter-text == "" ? @tr("Connect a server to discover containers.") : @tr("No matching containers."); wrap: word-wrap; text-color: Theme.muted; font-size: 12px; }
                         }
                     }
                     Rectangle { background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line; horizontal-stretch: 1;
@@ -205,15 +237,15 @@ export component ContainerSafeWindow inherits Window {
                                 }
                             }
                             HorizontalLayout { height: 36px; spacing: 6px;
-                                Button { text: "All sources"; primary: root.entry-kind == 0; clicked => { root.entry-kind = 0; root.filter-entries(); } }
-                                Button { text: "Storage"; primary: root.entry-kind == 1; clicked => { root.entry-kind = 1; root.filter-entries(); } }
-                                Button { text: "Databases"; primary: root.entry-kind == 2; clicked => { root.entry-kind = 2; root.filter-entries(); } }
+                                Button { text: @tr("All sources"); primary: root.entry-kind == 0; clicked => { root.entry-kind = 0; root.filter-entries(); } }
+                                Button { text: @tr("Storage"); primary: root.entry-kind == 1; clicked => { root.entry-kind = 1; root.filter-entries(); } }
+                                Button { text: @tr("Databases"); primary: root.entry-kind == 2; clicked => { root.entry-kind = 2; root.filter-entries(); } }
                                 Rectangle { horizontal-stretch: 1; }
                             }
                             HorizontalLayout { height: 22px; padding-left: 12px; padding-right: 8px;
-                                SelectableText { text: "SOURCE & RECOVERY METHOD"; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                                SelectableText { text: @tr("SOURCE & RECOVERY METHOD"); text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
-                                SelectableText { text: "BACKUP SELECTION"; width: 186px; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                                SelectableText { text: @tr("BACKUP SELECTION"); width: 186px; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
                             }
                             ListView {
                                 for entry in root.entries: Rectangle {
@@ -222,27 +254,27 @@ export component ContainerSafeWindow inherits Window {
                                     VerticalLayout { spacing: 0px;
                                         HorizontalLayout { padding-top: 10px; padding-bottom: 10px; padding-right: 12px; spacing: 12px;
                                             Rectangle { width: 44px; height: 26px; border-radius: 5px; background: entry.database ? #f0eafa : #e7f3ee;
-                                                Text { text: entry.database ? "DB" : "DATA"; color: entry.database ? #73539a : #39765c; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                                Text { text: entry.database ? @tr("DB") : @tr("DATA"); color: entry.database ? #73539a : #39765c; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
                                             }
                                             VerticalLayout { horizontal-stretch: 1; spacing: 5px;
                                                 HorizontalLayout { spacing: 6px;
                                                     SelectableText { text: entry.title; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
-                                                    if entry.database && !entry.has-method : InfoButton { label: "Backup unavailable: " + entry.title; help: entry.unavailable-help; warning: true; }
+                                                    if entry.database && !entry.has-method : InfoButton { label: @tr("Backup unavailable: ") + entry.title; help: entry.unavailable-help; warning: true; }
                                                 }
                                                 SelectableText { text: entry.location; text-color: Theme.muted; font-size: 12px; overflow: elide; }
                                                 SelectableText { text: entry.detail; text-color: entry.caution ? #976b20 : #7f8fa1; font-size: 11px; overflow: elide; }
                                             }
                                             ComboBox { width: 154px; model: entry.options; current-index: entry.choice; enabled: !root.loading; selected(value) => { root.choose-decision(entry.row-index, self.current-index); } }
                                             Rectangle { width: 20px; height: 36px;
-                                                InfoButton { y: (parent.height - self.height) / 2; label: "Backup options: " + entry.title; help: entry.option-help; }
+                                                InfoButton { y: (parent.height - self.height) / 2; label: @tr("Backup options: ") + entry.title; help: entry.option-help; }
                                             }
                                         }
                                         Rectangle { height: 1px; background: #e8edf3; }
                                     }
                                 }
                             }
-                            if root.entries.length == 0 : SelectableText { height: 72px; text: root.active-index < 0 ? "Choose a container or stack to review its storage." : "No persistent storage or database detected for this selection."; text-color: Theme.muted; wrap: word-wrap; }
-                            SelectableText { height: 24px; text: "Selections prepare a backup plan. Production backup execution is not enabled."; text-color: #8996a6; font-size: 11px; overflow: elide; vertical-alignment: center; }
+                            if root.entries.length == 0 : SelectableText { height: 72px; text: root.active-index < 0 ? @tr("Choose a container or stack to review its storage.") : @tr("No persistent storage or database detected for this selection."); text-color: Theme.muted; wrap: word-wrap; }
+                            SelectableText { height: 24px; text: @tr("Selections prepare a backup plan. Production backup execution is not enabled."); text-color: #8996a6; font-size: 11px; overflow: elide; vertical-alignment: center; }
                         }
                     }
                 }
@@ -250,21 +282,21 @@ export component ContainerSafeWindow inherits Window {
             if root.page == 1 : VerticalLayout {
                 padding: 22px; spacing: 18px;
                 HorizontalLayout { spacing: 12px;
-                    Metric { label: "Selected operations"; value: root.selected-operations; tint: #39765c; }
-                    Metric { label: "No backup selected"; value: root.pending-decisions; tint: #b58d46; }
-                    Metric { label: "Excluded items"; value: root.excluded-decisions; tint: #8996a6; }
-                    Metric { label: "Eligible plans"; value: root.plan-model.length; tint: #6083b5; }
+                    Metric { label: @tr("Selected operations"); value: root.selected-operations; tint: #39765c; }
+                    Metric { label: @tr("No backup selected"); value: root.pending-decisions; tint: #b58d46; }
+                    Metric { label: @tr("Excluded items"); value: root.excluded-decisions; tint: #8996a6; }
+                    Metric { label: @tr("Eligible plans"); value: root.plan-model.length; tint: #6083b5; }
                 }
                 Rectangle { background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line; vertical-stretch: 1;
                     VerticalLayout { padding: 22px; spacing: 14px;
-                        SelectableText { text: "Review your backup selections"; font-size: 20px; font-weight: 700; text-color: Theme.ink; }
-                        SelectableText { text: "Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate."; font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
+                        SelectableText { text: @tr("Review your backup selections"); font-size: 20px; font-weight: 700; text-color: Theme.ink; }
+                        SelectableText { text: @tr("Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate."); font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
                         Rectangle { height: 40px; background: #f3f6fa; border-radius: 5px;
                             HorizontalLayout { padding-left: 14px; padding-right: 14px; spacing: 16px;
-                                SelectableText { text: "STACK / CONTAINER"; text-color: #6b7f94; font-size: 10px; font-weight: 650; horizontal-stretch: 1; vertical-alignment: center; }
-                                SelectableText { text: "SELECTED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
-                                SelectableText { text: "EXCLUDED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
-                                SelectableText { text: "NO BACKUP"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: @tr("STACK / CONTAINER"); text-color: #6b7f94; font-size: 10px; font-weight: 650; horizontal-stretch: 1; vertical-alignment: center; }
+                                SelectableText { text: @tr("SELECTED"); width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: @tr("EXCLUDED"); width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: @tr("NO BACKUP"); width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
                                 Rectangle { width: 90px; }
                             }
                         }
@@ -275,31 +307,31 @@ export component ContainerSafeWindow inherits Window {
                                     HorizontalLayout { padding-left: 14px; padding-right: 14px; spacing: 16px;
                                         VerticalLayout { horizontal-stretch: 1; alignment: center; spacing: 5px;
                                             SelectableText { text: plan.name; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
-                                            SelectableText { text: plan.kind + " · " + plan.containers + " containers"; text-color: Theme.muted; font-size: 11px; }
+                                            SelectableText { text: plan.kind + " · " + plan.containers + @tr(" containers"); text-color: Theme.muted; font-size: 11px; }
                                         }
                                         SelectableText { text: plan.selected; width: 82px; text-color: #39765c; font-weight: 600; vertical-alignment: center; }
                                         SelectableText { text: plan.excluded; width: 82px; text-color: Theme.muted; vertical-alignment: center; }
                                         SelectableText { text: plan.pending; width: 82px; text-color: plan.pending > 0 ? #976b20 : #39765c; font-weight: 600; vertical-alignment: center; }
-                                        Button { width: 90px; text: "Review"; clicked => { root.filter-text = ""; root.page = 0; root.select-node(plan.app-index, ""); } }
+                                        Button { width: 90px; text: @tr("Review"); clicked => { root.filter-text = ""; root.page = 0; root.select-node(plan.app-index, ""); } }
                                     }
                                     Rectangle { height: 1px; background: #e8edf3; }
                                 }
                             }
                         }
-                        if root.plan-model.length == 0 : SelectableText { height: 70px; text: root.total-apps == 0 ? "Connect a server and discover its containers first." : "No selectable backup methods are available for the discovered containers. See Containers for source and database explanations."; text-color: Theme.muted; wrap: word-wrap; }
-                        SelectableText { text: "Planning only · No scheduled or production backups have been created."; text-color: #8996a6; font-size: 11px; }
+                        if root.plan-model.length == 0 : SelectableText { height: 70px; text: root.total-apps == 0 ? @tr("Connect a server and discover its containers first.") : @tr("No selectable backup methods are available for the discovered containers. See Containers for source and database explanations."); text-color: Theme.muted; wrap: word-wrap; }
+                        SelectableText { text: @tr("Planning only · No scheduled or production backups have been created."); text-color: #8996a6; font-size: 11px; }
                     }
                 }
             }
             if root.page == 2 || root.page == 3 : Rectangle {
                 background: Theme.canvas; vertical-stretch: 1;
                 VerticalLayout { padding: 36px; spacing: 16px; alignment: start;
-                    SelectableText { text: root.page == 2 ? "No backup activity yet" : "ContainerSafe " + root.app-version; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
-                    SelectableText { text: root.page == 2 ? "Discover your containers, review storage and save your selections. Production scheduling is not enabled." : "Native Docker discovery and backup planning. Built with Rust + Slint."; wrap: word-wrap; text-color: Theme.muted; }
+                    SelectableText { text: root.page == 2 ? @tr("No backup activity yet") : "ContainerSafe " + root.app-version; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
+                    SelectableText { text: root.page == 2 ? @tr("Discover your containers, review storage and save your selections. Production scheduling is not enabled.") : @tr("Native Docker discovery and backup planning. Built with Rust + Slint."); wrap: word-wrap; text-color: Theme.muted; }
                     if root.page == 3 : AboutSlint { height: 80px; }
                 }
             }
-            Rectangle { height: 38px; background: white;
+            if root.page != 4 : Rectangle { height: 38px; background: white;
                 HorizontalLayout { padding-left: 24px; padding-right: 24px; spacing: 14px;
                     SelectableText { text: root.status-message; text-color: #556c82; font-size: 11px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
                     SelectableText { text: root.validation-message; text-color: #7b8da2; font-size: 11px; overflow: elide; vertical-alignment: center; }
@@ -335,11 +367,11 @@ export component ContainerSafeWindow inherits Window {
             width: 690px; height: 320px; background: #ffffff; border-radius: 8px;
             VerticalLayout {
                 padding: 24px; spacing: 14px;
-                SelectableText { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; text-color: #8b641e; font-weight: 700; font-size: 18px; }
+                SelectableText { text: root.dialog == 5 ? @tr("Remove server?") : root.host-changed ? @tr("HOST KEY CHANGED — connection blocked") : @tr("Trust SSH host identity?"); text-color: #8b641e; font-weight: 700; font-size: 18px; }
                 SelectableText { text: root.host-question; wrap: word-wrap; text-color: #3b536b; }
                 HorizontalLayout {
-                    Button { text: "Cancel / Reject"; clicked => { root.server-action("cancel"); } }
-                    Button { text: root.dialog == 5 ? "Remove profile and credential" : root.host-changed ? "Approve reviewed replacement" : "Trust this host";
+                    Button { text: @tr("Cancel / Reject"); clicked => { root.server-action("cancel"); } }
+                    Button { text: root.dialog == 5 ? @tr("Remove profile and credential") : root.host-changed ? @tr("Approve reviewed replacement") : @tr("Trust this host");
                         clicked => { if root.dialog == 5 { root.server-action("confirm-remove"); } else { root.trust-host(); } }
                     }
                 }
@@ -351,9 +383,9 @@ export component ContainerSafeWindow inherits Window {
             VerticalLayout {
                 padding: 28px; spacing: 16px;
                 SelectableText { text-color: #192b42; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
-                SelectableText { text-color: #62748a; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
+                SelectableText { text-color: #62748a; text: @tr("Native Docker backup readiness manager. Rust + Slint."); wrap: word-wrap; }
                 AboutSlint { height: 110px; }
-                Button { text: "Close"; clicked => { root.server-action("cancel"); } }
+                Button { text: @tr("Close"); clicked => { root.server-action("cancel"); } }
             }
         }
     }

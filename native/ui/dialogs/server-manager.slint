@@ -11,12 +11,12 @@ export component ServerManager inherits Rectangle {
     VerticalLayout {
         padding: 22px;
         spacing: 12px;
-        SelectableText { text: "Servers"; font-size: 22px; font-weight: 700; text-color: #192b42; }
+        SelectableText { text: @tr("Servers"); font-size: 22px; font-weight: 700; text-color: #192b42; }
         HorizontalLayout {
-            SelectableText { text-color: #253b52; text: "Name"; width: 190px; }
-            SelectableText { text-color: #253b52; text: "Host"; width: 200px; }
-            SelectableText { text-color: #253b52; text: "Status"; width: 120px; }
-            SelectableText { text-color: #253b52; text: "Last opened"; }
+            SelectableText { text-color: #253b52; text: @tr("Name"); width: 190px; }
+            SelectableText { text-color: #253b52; text: @tr("Host"); width: 200px; }
+            SelectableText { text-color: #253b52; text: @tr("Status"); width: 120px; }
+            SelectableText { text-color: #253b52; text: @tr("Last opened"); }
         }
         ListView {
             for server[i] in root.servers: Rectangle {
@@ -31,15 +31,15 @@ export component ServerManager inherits Rectangle {
                 }
             }
         }
-        SelectableText { text: "★ = Default server. Opening a server preserves the default preference."; text-color: #62748a; }
+        SelectableText { text: @tr("★ = Default server. Opening a server preserves the default preference."); text-color: #62748a; }
         HorizontalLayout {
-            Button { text: "New"; clicked => { root.action("new"); } }
-            Button { text: "Edit"; enabled: root.selected >= 0; clicked => { root.action("edit"); } }
-            Button { text: "Remove"; enabled: root.selected >= 0; clicked => { root.action("remove"); } }
-            Button { text: "Set Default"; enabled: root.selected >= 0; clicked => { root.action("default"); } }
+            Button { text: @tr("New"); clicked => { root.action("new"); } }
+            Button { text: @tr("Edit"); enabled: root.selected >= 0; clicked => { root.action("edit"); } }
+            Button { text: @tr("Remove"); enabled: root.selected >= 0; clicked => { root.action("remove"); } }
+            Button { text: @tr("Set Default"); enabled: root.selected >= 0; clicked => { root.action("default"); } }
             Rectangle { horizontal-stretch: 1; }
-            Button { text: "Cancel"; clicked => { root.action("cancel"); } }
-            Button { text: "Open"; enabled: root.selected >= 0; clicked => { root.action("open"); } }
+            Button { text: @tr("Cancel"); clicked => { root.action("cancel"); } }
+            Button { text: @tr("Open"); enabled: root.selected >= 0; clicked => { root.action("open"); } }
         }
     }
 }

@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.16** · Next releases increment by **0.01** (0.17, 0.18, …).
+**Version 0.17** · Next releases increment by **0.01** (0.18, 0.19, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -20,7 +20,7 @@ ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recov
 
 ![ContainerSafe splash screen](native/assets/splash.png)
 
-*Splash screen concept and native UI — interface artwork currently includes Romanian copy. English localization is planned.*
+*English and Romanian interfaces are available from File → Settings. Splash artwork remains a fixed image.*
 
 </div>
 
@@ -213,3 +213,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
 [⭐ Star](https://github.com/matrixn/ContainerSafe) · [🐛 Issues](https://github.com/matrixn/ContainerSafe/issues)
 
 </div>
+
+## Desktop preferences and language (0.17)
+
+Open **File → Settings** (Romanian: **Fișier → Setări**), also available in the sidebar. Each preference has a description and saves immediately, with a confirmation below the changed setting. English is the default; Romanian applies immediately to navigation, dialogs, help and backup choices. Remote SSH/Docker output and technical diagnostic details retain their original text.
+
+- Language: English / Română.
+- Startup page: Containers / Backup plans. Applied on the next launch.
+- Initial source filter: All sources / Storage / Databases. Applied on the next launch; the workspace filter remains freely adjustable.
+- New server defaults: SSH port (22, 2022, 2222), timeout (10, 30, 60, 120 seconds), Docker access (Automatic, Direct, passwordless sudo). Existing profiles are unchanged; all supported values can still be entered in the server form.
+- Connect on startup: On / Off. On preserves the existing default-server startup flow; Off starts disconnected for manual connection through Servers. Host-key verification is always mandatory.
+
+Preferences live in `settings.json` beside `servers.json`, contain no secrets, and are separate from per-server backup selections. A failed save keeps the previous value active and shows an error. Invalid or unsupported configuration is preserved and editing is blocked rather than silently overwriting it.
+
+To add or maintain Romanian translations, edit `native/translations/ro.json`, then run `python scripts/update-translations.py` (or `--check` to verify the bundled gettext catalog). Translations are built into the application; no gettext runtime or download is required.
