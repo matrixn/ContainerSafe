@@ -2,6 +2,14 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.16 — 2026-10-24
+
+- Show only stacks/standalone containers with at least one selectable Include or Logical dump method in Backup plans; No backup and Exclude do not count as methods. Preserve original Review targets and update plan counts/empty states after filtering.
+- Display No backup instead of Pending in selectors, plan summaries and validation messages. Preserve the stored `pending` value and its review requirement for compatibility with existing saved selections.
+- Add circled info icons beside backup selectors with option-specific tooltips and copyable help popups. Add a separate warning info icon for database entries without a selectable adapter, explaining why backup is unavailable.
+- Keep PostgreSQL logical dump explicitly labeled as a planning strategy whose execution adapter is not implemented. Do not enable raw database copies or unsupported database adapters.
+- Add eligibility/index-mapping and tooltip/backward-compatibility tests; increment shared/native versions to 0.16.
+
 ## 0.15 — 2026-10-24
 
 - Redesign the desktop workspace with a light slate/white palette, teal primary actions, readable typography, section cards, consistent spacing and the actual application logo beside the name.

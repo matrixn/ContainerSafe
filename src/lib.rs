@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[cfg(feature = "server-management")]
 pub mod servers;
-pub const VERSION: &str = "0.15";
+pub const VERSION: &str = "0.16";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {

@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.15** · Next releases increment by **0.01** (0.16, 0.17, …).
+**Version 0.16** · Next releases increment by **0.01** (0.17, 0.18, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -126,7 +126,7 @@ In VS Code, use **Terminal → Run Task → Run ContainerSafe desktop**. **Ctrl+
 
 After the splash, first launch opens **New Docker Server**. Configure and test SSH, review the host fingerprint, then save. Later launches connect to the default server asynchronously. **File → Servers...** manages profiles and switches servers; the selected server and version are visible in the application bar. Offline servers leave the app open.
 
-The light workspace separates **Containers** (searchable Compose/project/container and standalone tree, with storage/database review) from **Backup plans** (selected/excluded/pending totals per plan). Choose decisions explicitly from dropdowns; protected raw database paths cannot be included. See [v0.15 interface and Romanian test instructions](docs/UI_REDESIGN.md).
+The light workspace separates **Containers** (searchable Compose/project/container and standalone tree, with storage/database review) from **Backup plans** (only stacks/containers with a selectable backup method). Choose decisions explicitly from dropdowns; **No backup** means no method selected yet, while **Exclude** records an explicit skip. Info icons explain each available option and unsupported database backups. Protected raw database paths cannot be included. See [interface and Romanian test instructions](docs/UI_REDESIGN.md).
 
 Profiles live in `%APPDATA%\ContainerSafe\servers.json` on Windows, with per-server backup data under `servers/<uuid>/`. Passwords/passphrases use the OS credential store, or remain session-only when Remember is unchecked. Existing repository JSON files are never imported automatically. See [server setup, PPK integration, migration and validation](docs/SERVER_MANAGEMENT.md).
 

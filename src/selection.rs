@@ -108,7 +108,10 @@ pub fn validate(report: &BackupReport, selection: &BackupSelection) -> Vec<Strin
                     }
                 }
                 "exclude" => {}
-                "pending" => errors.push(format!("Source still pending: {}", selected.path)),
+                "pending" => errors.push(format!(
+                    "No backup method selected; source review required: {}",
+                    selected.path
+                )),
                 _ => errors.push(format!("Invalid source decision: {}", selected.path)),
             }
         }
@@ -140,7 +143,10 @@ pub fn validate(report: &BackupReport, selection: &BackupSelection) -> Vec<Strin
                     selected_count += 1;
                 }
                 "exclude" => {}
-                "pending" => errors.push(format!("Database still pending: {}", selected.container)),
+                "pending" => errors.push(format!(
+                    "No backup method selected; database review required: {}",
+                    selected.container
+                )),
                 _ => errors.push(format!(
                     "Unsupported database decision for {}: {}",
                     selected.container, selected.decision

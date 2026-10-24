@@ -1,5 +1,5 @@
 import { SelectableText } from "selectable-text.slint";
-import { Theme, ActionButton as Button, ChoiceBox as ComboBox } from "theme.slint";
+import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton } from "theme.slint";
 export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
@@ -7,7 +7,7 @@ export { ServerRow } from "dialogs/server-manager.slint";
 import { ListView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
 export struct TreeEntry { key: string, name: string, note: string, depth: int, branch: bool, expanded: bool, selected: bool, app-index: int, container: string }
 export struct PlanEntry { name: string, kind: string, containers: int, selected: int, excluded: int, pending: int, app-index: int }
-export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int }
+export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int, has-method: bool, option-help: string, unavailable-help: string }
 component NavLine inherits Rectangle {
     in property <string> label; in property <bool> active; callback pressed;
     height: 40px; border-radius: 7px;
@@ -213,7 +213,7 @@ export component ContainerSafeWindow inherits Window {
                             HorizontalLayout { height: 22px; padding-left: 12px; padding-right: 8px;
                                 SelectableText { text: "SOURCE & RECOVERY METHOD"; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
-                                SelectableText { text: "BACKUP SELECTION"; width: 154px; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
+                                SelectableText { text: "BACKUP SELECTION"; width: 186px; text-color: #7b8b9d; font-size: 10px; font-weight: 650; vertical-alignment: center; }
                             }
                             ListView {
                                 for entry in root.entries: Rectangle {
@@ -225,11 +225,17 @@ export component ContainerSafeWindow inherits Window {
                                                 Text { text: entry.database ? "DB" : "DATA"; color: entry.database ? #73539a : #39765c; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
                                             }
                                             VerticalLayout { horizontal-stretch: 1; spacing: 5px;
-                                                SelectableText { text: entry.title; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
+                                                HorizontalLayout { spacing: 6px;
+                                                    SelectableText { text: entry.title; text-color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                                                    if entry.database && !entry.has-method : InfoButton { label: "Backup unavailable: " + entry.title; help: entry.unavailable-help; warning: true; }
+                                                }
                                                 SelectableText { text: entry.location; text-color: Theme.muted; font-size: 12px; overflow: elide; }
                                                 SelectableText { text: entry.detail; text-color: entry.caution ? #976b20 : #7f8fa1; font-size: 11px; overflow: elide; }
                                             }
                                             ComboBox { width: 154px; model: entry.options; current-index: entry.choice; enabled: !root.loading; selected(value) => { root.choose-decision(entry.row-index, self.current-index); } }
+                                            Rectangle { width: 20px; height: 36px;
+                                                InfoButton { y: (parent.height - self.height) / 2; label: "Backup options: " + entry.title; help: entry.option-help; }
+                                            }
                                         }
                                         Rectangle { height: 1px; background: #e8edf3; }
                                     }
@@ -245,20 +251,20 @@ export component ContainerSafeWindow inherits Window {
                 padding: 22px; spacing: 18px;
                 HorizontalLayout { spacing: 12px;
                     Metric { label: "Selected operations"; value: root.selected-operations; tint: #39765c; }
-                    Metric { label: "Pending decisions"; value: root.pending-decisions; tint: #b58d46; }
+                    Metric { label: "No backup selected"; value: root.pending-decisions; tint: #b58d46; }
                     Metric { label: "Excluded items"; value: root.excluded-decisions; tint: #8996a6; }
-                    Metric { label: "Selection plans"; value: root.total-apps; tint: #6083b5; }
+                    Metric { label: "Eligible plans"; value: root.plan-model.length; tint: #6083b5; }
                 }
                 Rectangle { background: white; border-radius: 10px; border-width: 1px; border-color: Theme.line; vertical-stretch: 1;
                     VerticalLayout { padding: 22px; spacing: 14px;
                         SelectableText { text: "Review your backup selections"; font-size: 20px; font-weight: 700; text-color: Theme.ink; }
-                        SelectableText { text: "See what is included, excluded or still pending. Review a plan, save your changes, then validate."; font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
+                        SelectableText { text: "Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate."; font-size: 12px; text-color: Theme.muted; wrap: word-wrap; }
                         Rectangle { height: 40px; background: #f3f6fa; border-radius: 5px;
                             HorizontalLayout { padding-left: 14px; padding-right: 14px; spacing: 16px;
                                 SelectableText { text: "STACK / CONTAINER"; text-color: #6b7f94; font-size: 10px; font-weight: 650; horizontal-stretch: 1; vertical-alignment: center; }
                                 SelectableText { text: "SELECTED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
                                 SelectableText { text: "EXCLUDED"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
-                                SelectableText { text: "PENDING"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
+                                SelectableText { text: "NO BACKUP"; width: 82px; text-color: #6b7f94; font-size: 10px; vertical-alignment: center; }
                                 Rectangle { width: 90px; }
                             }
                         }
@@ -280,7 +286,7 @@ export component ContainerSafeWindow inherits Window {
                                 }
                             }
                         }
-                        if root.plan-model.length == 0 : SelectableText { height: 70px; text: "No plans yet. Connect a server and discover its containers first."; text-color: Theme.muted; wrap: word-wrap; }
+                        if root.plan-model.length == 0 : SelectableText { height: 70px; text: root.total-apps == 0 ? "Connect a server and discover its containers first." : "No selectable backup methods are available for the discovered containers. See Containers for source and database explanations."; text-color: Theme.muted; wrap: word-wrap; }
                         SelectableText { text: "Planning only · No scheduled or production backups have been created."; text-color: #8996a6; font-size: 11px; }
                     }
                 }

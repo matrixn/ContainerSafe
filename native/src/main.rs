@@ -238,7 +238,7 @@ fn display_decision(value: &str) -> &'static str {
         "include" => "Include",
         "exclude" => "Exclude",
         "logical_dump" => "Logical dump",
-        _ => "Pending",
+        _ => "No backup",
     }
 }
 
@@ -336,6 +336,49 @@ fn decision_options(database: bool, policy: &str) -> ModelRc<slint::SharedString
             .map(|value| display_decision(value).into())
             .collect::<Vec<_>>(),
     ))
+}
+
+fn has_backup_method(database: bool, policy: &str) -> bool {
+    decision_values(database, policy)
+        .iter()
+        .any(|value| matches!(*value, "include" | "logical_dump"))
+}
+
+fn unavailable_backup_help(database: bool, policy: &str) -> String {
+    if has_backup_method(database, policy) {
+        return String::new();
+    }
+    if database {
+        match policy {
+            "Redis/Valkey" => "Redis/Valkey backup is unavailable: a verified persistence backup adapter has not been implemented. Its live database files must not be copied as a generic file backup. No backup leaves this item unreviewed; Exclude records an explicit decision to skip it.",
+            "MySQL" | "MariaDB" => "This database needs a consistent logical dump. A selectable MySQL/MariaDB dump adapter is not implemented in this build. Copying the live database directory is prohibited. No backup leaves it unreviewed; Exclude explicitly skips it.",
+            _ => "No selectable backup adapter is implemented for this database engine. A generic file copy is not a replacement for a consistent database backup. No backup leaves it unreviewed; Exclude explicitly skips it.",
+        }.into()
+    } else {
+        match policy {
+            "requires_logical_dump" => "This path contains live database files. Include is unavailable because copying them directly can produce an inconsistent backup. Review the database entry and select Logical dump if offered. Otherwise a suitable database adapter is still required.",
+            _ => "This source requires a verified persistence strategy. Generic file backup is unavailable until that strategy has been implemented and reviewed. No backup leaves it unreviewed; Exclude explicitly skips it.",
+        }.into()
+    }
+}
+
+fn backup_option_help(database: bool, policy: &str) -> String {
+    let mut lines = vec!["No backup: no method selected. This item is not approved for backup and still needs review before validation.".to_owned()];
+    for value in decision_values(database, policy) {
+        match value {
+            "include" => lines.push(if policy == "large_data_requires_opt_in" {
+                "Include: explicitly add this large storage source to the plan. Review its size and destination capacity first. This does not start a backup."
+            } else { "Include: add this persistent file source to the backup plan. This does not start a backup." }.into()),
+            "logical_dump" => lines.push("Logical dump: plan a consistent PostgreSQL database export instead of copying live database files. This saves the intended strategy; execution of the database adapter is not implemented yet.".into()),
+            "exclude" => lines.push("Exclude: explicitly omit this item from the plan and mark the skip as reviewed. Unlike No backup, this is a deliberate selection decision.".into()),
+            _ => {},
+        }
+    }
+    let unavailable = unavailable_backup_help(database, policy);
+    if !unavailable.is_empty() {
+        lines.push(unavailable);
+    }
+    lines.join("\n\n")
 }
 
 fn container_tree(
@@ -568,6 +611,9 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             _ => "Candidate persistent source · review before backup",
         };
         entries.push(DataEntry {
+            has_method: has_backup_method(false, &source.policy),
+            option_help: backup_option_help(false, &source.policy).into(),
+            unavailable_help: unavailable_backup_help(false, &source.policy).into(),
             row_index: source_index as i32,
             title: source_label(&source.path).into(),
             location: source.path.as_str().into(),
@@ -588,6 +634,9 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             .map(|d| d.decision.as_str())
             .unwrap_or("pending");
         entries.push(DataEntry {
+            has_method: has_backup_method(true, &db.engine),
+            option_help: backup_option_help(true, &db.engine).into(),
+            unavailable_help: unavailable_backup_help(true, &db.engine).into(),
             row_index: (app.sources.len() + database_index) as i32,
             title: db.container.as_str().into(),
             location: db.engine.as_str().into(),
@@ -612,6 +661,15 @@ fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<Plan
         .applications
         .iter()
         .enumerate()
+        .filter(|(_, app)| {
+            app.sources
+                .iter()
+                .any(|source| has_backup_method(false, &source.policy))
+                || app
+                    .databases
+                    .iter()
+                    .any(|db| has_backup_method(true, &db.engine))
+        })
         .map(|(index, app)| {
             let selected = selection
                 .applications
@@ -824,7 +882,7 @@ fn create_main_window(
                     render(&ui, &guard);
                     ui.set_status_message(
                         format!(
-                            "Selection saved · {} selected operations · {} pending",
+                            "Selection saved · {} selected operations · {} with no backup selected",
                             selected_count(&guard),
                             pending_count(&guard)
                         )
@@ -1134,6 +1192,89 @@ mod tests {
             decision_values(true, "Redis/Valkey"),
             ["pending", "exclude"]
         );
+    }
+
+    #[test]
+    fn plans_require_a_backup_method_and_keep_original_review_indices() {
+        let mut report: BackupReport =
+            serde_json::from_str(include_str!("../tests/fixtures/ui-report.json")).unwrap();
+        report.applications[0].sources.clear();
+        report.applications[0].databases.clear();
+        report.applications[2].databases.push(DatabasePlan {
+            container: "mysql".into(),
+            engine: "MySQL".into(),
+            required_method: "logical_dump".into(),
+        });
+        report.applications[3].sources.push(SourcePlan {
+            path: "/fixture/raw-db".into(),
+            mount_type: "bind".into(),
+            destination: "/db".into(),
+            policy: "requires_logical_dump".into(),
+        });
+        report.applications[4].databases.push(DatabasePlan {
+            container: "redis".into(),
+            engine: "Redis/Valkey".into(),
+            required_method: "manual_persistence_review".into(),
+        });
+        report.applications[5].databases.push(DatabasePlan {
+            container: "pg".into(),
+            engine: "PostgreSQL".into(),
+            required_method: "logical_dump".into(),
+        });
+        report.applications[10].sources.push(SourcePlan {
+            path: "/fixture/data".into(),
+            mount_type: "bind".into(),
+            destination: "/data".into(),
+            policy: "review_for_backup".into(),
+        });
+        let mut selection = draft(&report);
+        selection.applications[10].sources[0].decision = "exclude".into();
+        let plans = plan_overview(&report, &selection);
+        assert_eq!(
+            plans.iter().map(|plan| plan.app_index).collect::<Vec<_>>(),
+            [1, 5, 10]
+        );
+        assert_eq!(
+            plans[2].excluded, 1,
+            "Eligibility depends on available methods, not the selected decision"
+        );
+        let unavailable = BackupReport {
+            schema_version: 1,
+            read_only: true,
+            applications: [2, 3, 4]
+                .into_iter()
+                .map(|i| report.applications[i].clone())
+                .collect(),
+        };
+        assert!(plan_overview(&unavailable, &draft(&unavailable)).is_empty());
+    }
+
+    #[test]
+    fn backup_help_matches_choices_and_no_backup_preserves_saved_pending_value() {
+        assert_eq!(display_decision("pending"), "No backup");
+        assert_eq!(decision_values(false, "review_for_backup")[0], "pending");
+        let source = backup_option_help(false, "review_for_backup");
+        assert!(
+            source.contains("No backup:")
+                && source.contains("Include:")
+                && source.contains("Exclude:")
+        );
+        assert!(!source.contains("Logical dump:"));
+        let database = backup_option_help(true, "PostgreSQL");
+        assert!(database.contains("Logical dump:") && database.contains("not implemented yet"));
+        for engine in ["Redis/Valkey", "MySQL", "MariaDB", "Unknown DB"] {
+            assert!(!has_backup_method(true, engine));
+            assert!(!unavailable_backup_help(true, engine).is_empty());
+            assert!(!backup_option_help(true, engine).contains("Include:"));
+            assert!(!backup_option_help(true, engine).contains("Logical dump:"));
+        }
+        assert!(!has_backup_method(false, "requires_logical_dump"));
+        assert!(!has_backup_method(false, "requires_persistence_review"));
+        let report: BackupReport =
+            serde_json::from_str(include_str!("../tests/fixtures/ui-report.json")).unwrap();
+        let saved = serde_json::to_string(&draft(&report)).unwrap();
+        assert!(saved.contains("\"decision\":\"pending\""));
+        assert!(!saved.contains("No backup"));
     }
 
     #[test]

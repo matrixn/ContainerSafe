@@ -1,3 +1,5 @@
+import { SelectableText } from "selectable-text.slint";
+
 export global Theme {
     out property <color> canvas: #f4f7fb;
     out property <color> surface: #ffffff;
@@ -6,6 +8,7 @@ export global Theme {
     out property <color> line: #dce4ed;
     out property <color> accent: #176b83;
 }
+
 export component ActionButton inherits Rectangle {
     in property <string> text;
     in property <bool> primary: false;
@@ -87,4 +90,31 @@ export component ToggleCheck inherits Rectangle {
         label := Text { text: root.text; color: root.enabled ? #35546a : #8b9aab; font-size: 13px; vertical-alignment: center; }
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: root.enabled ? pointer : default; clicked => { focus.focus(); root.checked = !root.checked; root.toggled(); } }
+}
+
+export component InfoButton inherits Rectangle {
+    in property <string> label: "Backup options";
+    in property <string> help;
+    in property <bool> warning: false;
+    width: 20px; height: 20px;
+    border-radius: 10px; border-width: 1px;
+    border-color: root.warning ? #d7b46c : #9bbbc9;
+    background: root.warning ? #fff7e7 : touch.has-hover ? #dceff5 : #edf6f9;
+    accessible-role: button; accessible-label: root.label + ". " + root.help;
+    accessible-action-default => { help-popup.show(); }
+    forward-focus: focus;
+    focus := FocusScope { key-pressed(event) => { if event.text == Key.Return || event.text == " " { help-popup.show(); return accept; } return reject; } }
+    Text { text: "i"; font-size: 12px; font-weight: 700; color: root.warning ? #976b20 : #176b83; horizontal-alignment: center; vertical-alignment: center; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); help-popup.show(); } }
+    Tooltip { VerticalLayout { padding: 12px; Text { width: 360px; text: root.help; color: Theme.ink; font-size: 12px; wrap: word-wrap; } } }
+    help-popup := PopupWindow {
+        x: root.width - self.width; y: -self.height - 6px; width: 400px;
+        Rectangle { background: white; border-radius: 8px; border-width: 1px; border-color: #b8cbd8;
+            VerticalLayout { padding: 16px; spacing: 12px;
+                SelectableText { text: root.label; text-color: Theme.ink; font-size: 14px; font-weight: 650; wrap: word-wrap; }
+                SelectableText { text: root.help; text-color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                ActionButton { text: "Close"; clicked => { help-popup.close(); } }
+            }
+        }
+    }
 }
