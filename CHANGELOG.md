@@ -2,6 +2,14 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## Unreleased
+
+- Run installer automation only on version-tag pushes (`v*`); normal branch pushes, release publication and manual dispatch no longer start builds.
+- Selectable read-only display text across the desktop, with Ctrl+A/Ctrl+C, full-value copying for shortened labels, a Copy report action and click-to-open copyable field help.
+- Probe Synology Container Manager and legacy Docker package paths when Docker is absent from the SSH PATH.
+- Report per-command Docker access diagnostics, distinguishing missing executables, denied access, sudo password/policy requirements and an unreachable daemon without displaying raw remote output.
+- Cover Synology package-path fallback and denied sudo access with the loopback SSH fixture.
+
 ## 0.10 — 2026-10-24
 
 - Redesigned server setup with Connection, Sign-in and Docker & test tabs, a wider responsive dialog and clearer spacing.

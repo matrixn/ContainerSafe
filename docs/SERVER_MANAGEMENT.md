@@ -16,6 +16,29 @@ File → Servers offers New, Edit, Remove (with confirmation), Set Default and O
 
 Use Retry / Refresh to reconnect. If startup needs a session-only password or an unavailable/encrypted-key passphrase, enter it in the masked form, test and save again. A failed default remains saved and the main application stays open. Help contains documentation and About with the Slint attribution widget. Keyboard shortcuts: Ctrl+N, Ctrl+Shift+S and Ctrl+Q; Escape closes the current dialog.
 
+Display text (labels, headings, status, reports, server details and inventory) supports selection and **Ctrl+C** without becoming editable. Click a text block and use **Ctrl+A** to select its full value, including content shortened with an ellipsis. **Copy report** copies the complete connection report. Hover an **i** for a tooltip, or click it to open selectable help. Buttons, navigation and menu captions retain their normal control behavior.
+
+## Synology: SSH works but Docker access fails
+
+SSH password/key authentication and Docker permissions are separate. A DSM administrator login may still require a password for sudo. The **Passwordless sudo -n** option only works when the server already permits that exact Docker command without a password; ContainerSafe never sends the SSH password to sudo.
+
+Use the actual NAS SSH port in the Connection tab. ContainerSafe does not load aliases, ports or identity files from OpenSSH's `.ssh/config`; enter those values explicitly. If your terminal alias uses port 2022, the app profile must also use 2022. A different port can reach a different SSH service with different permissions.
+
+The connection check tries Docker from PATH, `/usr/bin/docker`, `/usr/local/bin/docker`, `/var/packages/ContainerManager/target/usr/bin/docker` and the older `/var/packages/Docker/target/usr/bin/docker`, according to the selected direct/sudo mode. Failed checks report a fixed diagnostic category for each attempt: missing executable, Docker permission denied, sudo password required, sudo policy/terminal restriction, unreachable daemon or other failure. Raw remote error output is not displayed.
+
+To diagnose a NAS, run these read-only commands over SSH as the same user configured in the app:
+
+```sh
+id
+command -v docker
+docker version
+sudo -n docker version
+```
+
+An interactive `sudo -n` success can use authorization cached by an earlier sudo command in that terminal. To ignore cached credentials while checking the same formatted version probe as the app, run `sudo -n -k /usr/local/bin/docker version --format '{{.Server.Version}}'` (use the discovered executable path if different). A password-required result explains why that interactive terminal works while a fresh app SSH session fails.
+
+If the executable is missing from PATH, repeat the two version checks with the applicable package path above. A sudo password-required result needs a deliberate server-side permission decision; switching between SSH passwords and keys does not change it. ContainerSafe does not alter socket permissions, sudoers rules or group membership. Do not make the Docker socket world-writable to work around an access failure.
+
 ## Credentials and keys
 
 - **Password:** authenticated through libssh2, in process, without putting a password in command arguments. Password authentication must be enabled by the SSH server. Keyboard-interactive/PAM-only accounts are currently unsupported.

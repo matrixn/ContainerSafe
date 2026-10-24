@@ -1,3 +1,4 @@
+import { SelectableText } from "selectable-text.slint";
 // ContainerSafe native splash screen — Slint 1.18.x.
 // The background picture is bundled at compile time.
 // Progress and status are genuine UI properties updated from Rust.
@@ -27,24 +28,24 @@ export component SplashWindow inherits Window {
         height: 92px;
         background: #071526;
 
-        Text {
+        SelectableText {
             x: 28px;
             y: 10px;
             width: parent.width - 110px;
             height: 30px;
             text: root.loading-message;
-            color: #dcecff;
+            text-color: #dcecff;
             font-size: 14px;
             vertical-alignment: center;
         }
 
-        Text {
+        SelectableText {
             x: parent.width - 76px;
             y: 10px;
             width: 48px;
             height: 30px;
             text: root.loading-progress + "%";
-            color: #5cd5ff;
+            text-color: #5cd5ff;
             font-weight: 700;
             font-size: 14px;
             horizontal-alignment: right;
@@ -69,13 +70,13 @@ export component SplashWindow inherits Window {
             }
         }
 
-        Text {
+        SelectableText {
             x: 28px;
             y: 65px;
             width: parent.width - 56px;
             height: 18px;
             text: "Local startup checks only · No Docker changes performed";
-            color: #809ab7;
+            text-color: #809ab7;
             font-size: 11px;
             vertical-alignment: center;
         }

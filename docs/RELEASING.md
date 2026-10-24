@@ -2,49 +2,45 @@
 
 The `Build installers` workflow builds **Windows x64 MSI**, **Linux amd64 DEB** and a **Linux x64 tar.gz**. macOS packaging is intentionally omitted.
 
-## First release: 0.09
+## Create a release from a version tag
 
-After the workflow on `main` passes, use either path:
+The workflow starts **only when a version tag matching `v*` is pushed**, for example `v0.11`. Local commits, normal branch pushes (including `main`), publishing a release and manual dispatch do not start builds.
 
-1. In GitHub, open **Releases → Draft a new release**.
-2. Choose/create tag **`v0.09`**, targeting the current `main` commit that contains this workflow.
-3. Enter the title **ContainerSafe 0.09**, review the release notes, and select **Publish release**.
-4. Open **Actions → Build installers**. Windows and Linux build independently; assets are attached when both succeed. A published release can initially have no assets while compilation runs.
-
-Alternatively, push an annotated tag from the checked-out release commit:
+Validate locally, commit and push the release changes, then push an annotated tag from that release commit. This example assumes the source version has been advanced to `0.11`:
 
 ```powershell
-git tag -a v0.09 -m "ContainerSafe 0.09"
-git push origin v0.09
+git push origin main
+git tag -a v0.11 -m "ContainerSafe 0.11"
+git push origin v0.11
 ```
 
-That builds the installers and creates a **draft** release with generated notes and assets. Review that draft before selecting **Publish release**. Publishing triggers another validation/build; the same asset names and checksums are updated. No tag is created by normal commits or by the version script.
+The tag push builds Windows and Linux independently and creates a **draft** release with generated notes and assets after both succeed. Review that draft before selecting **Publish release**. Publishing the prepared draft does not rebuild the assets. No tag is created by normal commits or by the version script.
 
 Expected assets:
 
 ```text
-ContainerSafe-0.09-windows-x64.msi
-ContainerSafe-0.09-linux-amd64.deb
-ContainerSafe-0.09-linux-x64.tar.gz
+ContainerSafe-0.11-windows-x64.msi
+ContainerSafe-0.11-linux-amd64.deb
+ContainerSafe-0.11-linux-x64.tar.gz
 SHA256SUMS.txt
 ```
 
 ## Later releases
 
 ```powershell
-.\scripts\bump-version.ps1          # 0.09 -> 0.10; both Cargo manifests -> 0.10.0
+.\scripts\bump-version.ps1          # 0.10 -> 0.11; both Cargo manifests -> 0.11.0
 cargo check                        # Refresh the root lockfile
 cargo check --manifest-path native/Cargo.toml
-python scripts/release_metadata.py --tag v0.10
+python scripts/release_metadata.py --tag v0.11
 ```
 
-Review the changelog, commit and push the manifests, both updated lockfiles, shared display version and changelog, then create `v0.10`. Subsequent versions are `v0.11`, `v0.12`, etc. The workflow rejects a tag that differs from the display version or stale Cargo lockfiles. MSI requires a numeric product version: display `0.09` maps to installer/Cargo version `0.9.0`.
+Review the changelog, commit and push the manifests, both updated lockfiles, shared display version and changelog, then create the matching version tag. Subsequent versions advance by 0.01. The workflow rejects a tag that differs from the display version or stale Cargo lockfiles. MSI requires a numeric product version: display `0.11` maps to installer/Cargo version `0.11.0`.
 
 Do not move or overwrite a published tag. Fix the issue, advance by 0.01 and release a new tag.
 
 ## Test builds without publishing
 
-Every push to `main` builds and tests both installer targets, then stores the files as Actions artifacts for 14 days. It does not create a release. The workflow also has **Run workflow** for manual verification from a selected branch. Tag pushes and `release.published` attach assets to GitHub Releases only after both platform jobs pass.
+Run Cargo checks and builds locally for ordinary development. Branch pushes do not run GitHub Actions, and this workflow has no **Run workflow** entry point. A version tag push runs the checks and installer builds, stores artifacts for 14 days and attaches assets to the draft release after both platform jobs pass.
 
 No personal access token or publishing secret is required. The workflow uses GitHub's short-lived `GITHUB_TOKEN`; only the final release job requests `contents: write`. Build jobs have read-only repository access. GitHub Actions must be enabled for the repository. Third-party actions are pinned to verified commit SHAs, Rust is pinned in `rust-toolchain.toml`, Cargo builds use `--locked`, and WiX is pinned to 5.0.2. `SHA256SUMS.txt` covers all three release files.
 

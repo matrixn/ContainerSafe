@@ -85,6 +85,8 @@ The CLI and desktop share the root `containersafe` Rust library: server identiti
 
 Windows MSI and Linux DEB/tar.gz builds are automated through GitHub Actions. See [creating a GitHub release](docs/RELEASING.md). Tags use the display version, starting with `v0.09`; macOS packages are deferred.
 
+Installer builds run only when a version tag (`v*`) is pushed. Ordinary commits and branch pushes do not start GitHub Actions; publishing the generated release draft does not trigger another build.
+
 ### Prerequisites
 
 - **Rust and Cargo** (a toolchain compatible with Slint 1.18).

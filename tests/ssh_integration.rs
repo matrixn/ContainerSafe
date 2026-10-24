@@ -1,7 +1,7 @@
 use containersafe::servers::{
     connection::{Connection, Failure},
     credentials::Secret,
-    model::{Authentication, Server},
+    model::{Authentication, DockerAccess, Server},
 };
 use std::{
     collections::BTreeMap,
@@ -91,9 +91,25 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
         .unwrap_or_else(|_| panic!("Password SSH should succeed"));
     assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
     f.server.username = "denied".into();
+    let denied = Connection::open(&f.server, &password, &f.hosts)
+        .err()
+        .unwrap();
+    assert!(matches!(denied, Failure::Message(m) if
+        m.contains("permission denied") && m.contains("sudo requires a password")
+        && !m.contains("private-fixture-marker")));
+
+    // Simulate a NAS with no docker in PATH and a package-specific sudo rule.
+    f.server.username = "synology".into();
+    let connection = Connection::open(&f.server, &password, &f.hosts)
+        .unwrap_or_else(|_| panic!("Synology package path with sudo should succeed"));
+    assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
+    f.server.docker_access = DockerAccess::Direct;
     assert!(
-        matches!(Connection::open(&f.server,&password,&f.hosts),Err(Failure::Message(m)) if m.contains("Docker: Unavailable or permission denied"))
+        matches!(Connection::open(&f.server, &password, &f.hosts), Err(Failure::Message(m)) if m.contains("executable not found"))
     );
+    f.server.docker_access = DockerAccess::Sudo;
+    assert!(Connection::open(&f.server, &password, &f.hosts).is_ok());
+    f.server.docker_access = DockerAccess::Automatic;
     f.server.username = "fixture".into();
     f.server.authentication = Authentication::OpenSsh;
     f.server.key_path = f.key.clone();

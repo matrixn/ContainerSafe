@@ -2,18 +2,14 @@ name: Build installers
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  release:
-    types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: installers-${{ github.event.release.tag_name || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+  group: installers-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,14 +29,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || github.ref }}
+          ref: ${{ github.ref }}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: Validate version and tag
         id: version
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: python scripts/release_metadata.py --tag "$RELEASE_TAG"
 
   build:
@@ -61,7 +57,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || github.ref }}
+          ref: ${{ github.ref }}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
@@ -144,7 +140,7 @@ jobs:
 
   attach-release:
     needs: [version, build]
-    if: github.event_name == 'release' || (github.event_name == 'push' && github.ref_type == 'tag')
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

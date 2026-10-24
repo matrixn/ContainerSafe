@@ -1,3 +1,4 @@
+import { SelectableText } from "selectable-text.slint";
 export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
@@ -136,9 +137,9 @@ export component ContainerSafeWindow inherits Window {
                             height: 42px;
                             background: #2865a0;
                             border-radius: 9px;
-                            Text {
+                            SelectableText {
                                 text: "CS";
-                                color: white;
+                                text-color: white;
                                 font-size: 16px;
                                 font-weight: 800;
                                 horizontal-alignment: center;
@@ -147,23 +148,23 @@ export component ContainerSafeWindow inherits Window {
                         }
                         VerticalLayout {
                             spacing: 1px;
-                            Text { text: "ContainerSafe " + root.app-version; font-weight: 700; color: #f1f6ff; font-size: 15px; }
-                            Text { text: root.active-server; overflow: elide; color: #8da1bc; font-size: 10px; }
+                            SelectableText { text: "ContainerSafe " + root.app-version; font-weight: 700; text-color: #f1f6ff; font-size: 15px; }
+                            SelectableText { text: root.active-server; overflow: elide; text-color: #8da1bc; font-size: 10px; }
                         }
                     }
                 }
                 Rectangle { height: 1px; background: #2a3b51; }
-                Text { height: 28px; text: "WORKSPACE"; font-size: 10px; font-weight: 700; color: #6f88a8; vertical-alignment: center; }
+                SelectableText { height: 28px; text: "WORKSPACE"; font-size: 10px; font-weight: 700; text-color: #6f88a8; vertical-alignment: center; }
                 NavLine { label: "Applications"; active: root.page == 0; pressed => { root.page = 0; } }
                 NavLine { label: "Backup plans"; active: root.page == 1; pressed => { root.page = 1; } }
                 NavLine { label: "Activity"; active: root.page == 2; pressed => { root.page = 2; } }
                 Rectangle { vertical-stretch: 1; }
                 Rectangle { height: 1px; background: #2a3b51; }
                 NavLine { label: "About"; active: root.page == 3; pressed => { root.page = 3; } }
-                Text {
+                SelectableText {
                     height: 32px;
                     text: "DEVELOPMENT PREVIEW  |  READ ONLY";
-                    color: #7890aa;
+                    text-color: #7890aa;
                     font-size: 9px;
                     vertical-alignment: center;
                 }
@@ -182,11 +183,11 @@ export component ContainerSafeWindow inherits Window {
                         padding-left: 22px;
                         padding-right: 18px;
                         spacing: 12px;
-                        Text {
+                        SelectableText {
                             text: root.page == 3 ? "About ContainerSafe" : root.page == 2 ? "Activity" : root.page == 1 ? "Backup plans" : "Applications";
                             font-size: 20px;
                             font-weight: 700;
-                            color: #f1f5fe;
+                            text-color: #f1f5fe;
                             vertical-alignment: center;
                             horizontal-stretch: 1;
                         }
@@ -222,31 +223,31 @@ export component ContainerSafeWindow inherits Window {
                                 spacing: 22px;
                                 VerticalLayout {
                                     spacing: 0px;
-                                    Text { text: "APPLICATIONS"; color: #8299b5; font-size: 10px; }
-                                    Text { text: root.total-apps; color: #e9f2ff; font-size: 22px; font-weight: 700; }
+                                    SelectableText { text: "APPLICATIONS"; text-color: #8299b5; font-size: 10px; }
+                                    SelectableText { text: root.total-apps; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
                                 }
                                 Rectangle { width: 1px; background: #29394d; }
                                 VerticalLayout {
                                     spacing: 0px;
-                                    Text { text: "CONTAINERS"; color: #8299b5; font-size: 10px; }
-                                    Text { text: root.total-containers; color: #e9f2ff; font-size: 22px; font-weight: 700; }
+                                    SelectableText { text: "CONTAINERS"; text-color: #8299b5; font-size: 10px; }
+                                    SelectableText { text: root.total-containers; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
                                 }
                                 Rectangle { width: 1px; background: #29394d; }
                                 VerticalLayout {
                                     spacing: 0px;
-                                    Text { text: "DATA SOURCES"; color: #8299b5; font-size: 10px; }
-                                    Text { text: root.total-sources; color: #e9f2ff; font-size: 22px; font-weight: 700; }
+                                    SelectableText { text: "DATA SOURCES"; text-color: #8299b5; font-size: 10px; }
+                                    SelectableText { text: root.total-sources; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
                                 }
                                 Rectangle { width: 1px; background: #29394d; }
                                 VerticalLayout {
                                     spacing: 0px;
-                                    Text { text: "DATABASES"; color: #8299b5; font-size: 10px; }
-                                    Text { text: root.total-dbs; color: #e9f2ff; font-size: 22px; font-weight: 700; }
+                                    SelectableText { text: "DATABASES"; text-color: #8299b5; font-size: 10px; }
+                                    SelectableText { text: root.total-dbs; text-color: #e9f2ff; font-size: 22px; font-weight: 700; }
                                 }
                                 Rectangle { horizontal-stretch: 1; }
-                                Text {
+                                SelectableText {
                                     text: "Backup execution disabled";
-                                    color: #e4b77c;
+                                    text-color: #e4b77c;
                                     font-size: 12px;
                                     vertical-alignment: center;
                                 }
@@ -262,10 +263,10 @@ export component ContainerSafeWindow inherits Window {
                                     spacing: 0px;
                                     Rectangle {
                                         height: 42px;
-                                        Text {
+                                        SelectableText {
                                             x: 18px;
                                             text: "DOCKER APPLICATIONS";
-                                            color: #8aa2c0;
+                                            text-color: #8aa2c0;
                                             font-size: 11px;
                                             font-weight: 700;
                                             vertical-alignment: center;
@@ -275,6 +276,9 @@ export component ContainerSafeWindow inherits Window {
                                         for app[index] in root.applications: Rectangle {
                                             height: 64px;
                                             background: root.active-index == index ? #24405e : (Math.mod(index, 2) == 0 ? #132136 : #101c2d);
+                                            TouchArea {
+                                                clicked => { root.select-app(index); }
+                                            }
                                             Rectangle {
                                                 x: 12px;
                                                 y: 8px;
@@ -289,22 +293,21 @@ export component ContainerSafeWindow inherits Window {
                                                 padding-top: 10px;
                                                 padding-bottom: 9px;
                                                 spacing: 4px;
-                                                Text {
+                                                SelectableText {
                                                     text: app.name;
+                                                    activated => { root.select-app(index); }
                                                     font-weight: 650;
                                                     font-size: 13px;
-                                                    color: #ecf3ff;
+                                                    text-color: #ecf3ff;
                                                     overflow: elide;
                                                 }
-                                                Text {
+                                                SelectableText {
                                                     text: app.note;
+                                                    activated => { root.select-app(index); }
                                                     font-size: 11px;
-                                                    color: #8ca4c0;
+                                                    text-color: #8ca4c0;
                                                     overflow: elide;
                                                 }
-                                            }
-                                            TouchArea {
-                                                clicked => { root.select-app(index); }
                                             }
                                         }
                                     }
@@ -323,22 +326,22 @@ export component ContainerSafeWindow inherits Window {
                                             padding-right: 18px;
                                             padding-top: 13px;
                                             spacing: 6px;
-                                            Text {
+                                            SelectableText {
                                                 text: root.selected-name;
-                                                color: #f3f7ff;
+                                                text-color: #f3f7ff;
                                                 font-size: 19px;
                                                 font-weight: 700;
                                                 overflow: elide;
                                             }
-                                            Text {
+                                            SelectableText {
                                                 text: root.selected-summary;
-                                                color: #9eb4ce;
+                                                text-color: #9eb4ce;
                                                 font-size: 12px;
                                                 overflow: elide;
                                             }
-                                            Text {
+                                            SelectableText {
                                                 text: root.selected-warning;
-                                                color: #dcb37a;
+                                                text-color: #dcb37a;
                                                 font-size: 11px;
                                                 overflow: elide;
                                             }
@@ -351,8 +354,8 @@ export component ContainerSafeWindow inherits Window {
                                             padding-left: 16px;
                                             padding-right: 16px;
                                             spacing: 8px;
-                                            Text { text: "SOURCE / DATABASE"; horizontal-stretch: 1; color: #a6bdd9; font-size: 10px; font-weight: 700; vertical-alignment: center; }
-                                            Text { text: "DECISION"; width: 134px; color: #a6bdd9; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                            SelectableText { text: "SOURCE / DATABASE"; horizontal-stretch: 1; text-color: #a6bdd9; font-size: 10px; font-weight: 700; vertical-alignment: center; }
+                                            SelectableText { text: "DECISION"; width: 134px; text-color: #a6bdd9; font-size: 10px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
                                         }
                                     }
                                     ListView {
@@ -368,9 +371,9 @@ export component ContainerSafeWindow inherits Window {
                                                     height: 22px;
                                                     background: entry.database ? #3b2e4b : #203e4c;
                                                     border-radius: 4px;
-                                                    Text {
+                                                    SelectableText {
                                                         text: entry.database ? "DB" : "DATA";
-                                                        color: entry.database ? #e5beff : #9cd9d4;
+                                                        text-color: entry.database ? #e5beff : #9cd9d4;
                                                         font-size: 10px;
                                                         font-weight: 750;
                                                         horizontal-alignment: center;
@@ -380,9 +383,9 @@ export component ContainerSafeWindow inherits Window {
                                                 VerticalLayout {
                                                     horizontal-stretch: 1;
                                                     spacing: 3px;
-                                                    Text { text: entry.title; color: #f0f5fc; font-size: 12px; font-weight: 600; overflow: elide; }
-                                                    Text { text: entry.location; color: #91a6bf; font-size: 10px; overflow: elide; }
-                                                    Text { text: entry.detail; color: entry.caution ? #dfa66a : #718cac; font-size: 10px; overflow: elide; }
+                                                    SelectableText { text: entry.title; text-color: #f0f5fc; font-size: 12px; font-weight: 600; overflow: elide; }
+                                                    SelectableText { text: entry.location; text-color: #91a6bf; font-size: 10px; overflow: elide; }
+                                                    SelectableText { text: entry.detail; text-color: entry.caution ? #dfa66a : #718cac; font-size: 10px; overflow: elide; }
                                                 }
                                                 Button {
                                                     width: 132px;
@@ -397,12 +400,12 @@ export component ContainerSafeWindow inherits Window {
                                     Rectangle {
                                         height: 52px;
                                         background: #152338;
-                                        Text {
+                                        SelectableText {
                                             x: 18px;
                                             width: parent.width - 36px;
                                             height: parent.height;
                                             text: "Click a decision to cycle Pending / Include / Exclude (or Logical dump for PostgreSQL).";
-                                            color: #94acc8;
+                                            text-color: #94acc8;
                                             font-size: 11px;
                                             vertical-alignment: center;
                                             overflow: elide;
@@ -420,8 +423,8 @@ export component ContainerSafeWindow inherits Window {
                     VerticalLayout {
                         padding: 38px;
                         spacing: 14px;
-                        Text { text: "Activity history"; color: #f5f7ff; font-size: 22px; font-weight: 700; }
-                        Text { text: "No backup jobs have been executed. Job scheduling and Restic execution will be added after the core refactor."; color: #a2b5cd; wrap: word-wrap; }
+                        SelectableText { text: "Activity history"; text-color: #f5f7ff; font-size: 22px; font-weight: 700; }
+                        SelectableText { text: "No backup jobs have been executed. Job scheduling and Restic execution will be added after the core refactor."; text-color: #a2b5cd; wrap: word-wrap; }
                     }
                 }
 
@@ -431,10 +434,10 @@ export component ContainerSafeWindow inherits Window {
                     VerticalLayout {
                         padding: 38px;
                         spacing: 18px;
-                        Text { text: "ContainerSafe Native " + root.app-version; color: #f5f7ff; font-size: 22px; font-weight: 700; }
-                        Text { text: "Rust + Slint. No web browser, HTML, JavaScript, React, or Tauri runtime."; color: #b2c4d9; font-size: 14px; }
-                        Text { text: "Developer preview: discovery, planning, selection and validation only. Backup execution disabled."; color: #b2c4d9; wrap: word-wrap; }
-                        Text { text: "Built with Slint"; font-size: 13px; color: #9cb7d5; }
+                        SelectableText { text: "ContainerSafe Native " + root.app-version; text-color: #f5f7ff; font-size: 22px; font-weight: 700; }
+                        SelectableText { text: "Rust + Slint. No web browser, HTML, JavaScript, React, or Tauri runtime."; text-color: #b2c4d9; font-size: 14px; }
+                        SelectableText { text: "Developer preview: discovery, planning, selection and validation only. Backup execution disabled."; text-color: #b2c4d9; wrap: word-wrap; }
+                        SelectableText { text: "Built with Slint"; font-size: 13px; text-color: #9cb7d5; }
                         AboutSlint { width: 180px; height: 42px; }
                         Rectangle { vertical-stretch: 1; }
                     }
@@ -447,17 +450,17 @@ export component ContainerSafeWindow inherits Window {
                         padding-left: 18px;
                         padding-right: 18px;
                         spacing: 18px;
-                        Text {
+                        SelectableText {
                             text: root.status-message;
-                            color: #bed0e6;
+                            text-color: #bed0e6;
                             font-size: 11px;
                             vertical-alignment: center;
                             overflow: elide;
                             horizontal-stretch: 1;
                         }
-                        Text {
+                        SelectableText {
                             text: root.validation-message;
-                            color: #9db7d5;
+                            text-color: #9db7d5;
                             font-size: 11px;
                             vertical-alignment: center;
                             overflow: elide;
@@ -494,8 +497,8 @@ export component ContainerSafeWindow inherits Window {
             width: 690px; height: 320px; background: #16263b; border-radius: 8px;
             VerticalLayout {
                 padding: 24px; spacing: 14px;
-                Text { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; color: #efba88; font-weight: 700; font-size: 18px; }
-                Text { text: root.host-question; wrap: word-wrap; color: #d1e1f4; }
+                SelectableText { text: root.dialog == 5 ? "Remove server?" : root.host-changed ? "HOST KEY CHANGED — connection blocked" : "Trust SSH host identity?"; text-color: #efba88; font-weight: 700; font-size: 18px; }
+                SelectableText { text: root.host-question; wrap: word-wrap; text-color: #d1e1f4; }
                 HorizontalLayout {
                     Button { text: "Cancel / Reject"; clicked => { root.server-action("cancel"); } }
                     Button { text: root.dialog == 5 ? "Remove profile and credential" : root.host-changed ? "Approve reviewed replacement" : "Trust this host";
@@ -509,8 +512,8 @@ export component ContainerSafeWindow inherits Window {
             width: 560px; height: 350px; background: #16263b;
             VerticalLayout {
                 padding: 28px; spacing: 16px;
-                Text { color: #f0f5ff; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
-                Text { color: #b2c4d9; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
+                SelectableText { text-color: #f0f5ff; text: "ContainerSafe " + root.app-version; font-size: 24px; font-weight: 700; }
+                SelectableText { text-color: #b2c4d9; text: "Native Docker backup readiness manager. Rust + Slint."; wrap: word-wrap; }
                 AboutSlint { height: 110px; }
                 Button { text: "Close"; clicked => { root.server-action("cancel"); } }
             }

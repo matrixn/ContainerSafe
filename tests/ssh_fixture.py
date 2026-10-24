@@ -26,7 +26,7 @@ class Server(paramiko.ServerInterface):
         return "password,publickey"
 
     def check_auth_password(self, username, password):
-        return paramiko.AUTH_SUCCESSFUL if username in ("fixture", "denied") and password == "fixture-password" else paramiko.AUTH_FAILED
+        return paramiko.AUTH_SUCCESSFUL if username in ("fixture", "denied", "synology") and password == "fixture-password" else paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, key):
         return paramiko.AUTH_SUCCESSFUL if username == "fixture" and key == client_key else paramiko.AUTH_FAILED
@@ -37,9 +37,14 @@ class Server(paramiko.ServerInterface):
     def check_channel_exec_request(self, channel, command):
         def execute():
             command_text = command.decode()
-            if channel.get_transport().get_username() == "denied":
-                channel.send_stderr(b"permission denied\n")
+            username = channel.get_transport().get_username()
+            synology_command = command_text.startswith("sudo -n /var/packages/ContainerManager/target/usr/bin/docker ")
+            if username == "denied":
+                channel.send_stderr(b"sudo: a password is required\nprivate-fixture-marker\n" if command_text.startswith("sudo ") else b"permission denied\nprivate-fixture-marker\n")
                 status = 1
+            elif username == "synology" and not synology_command:
+                channel.send_stderr(b"sh: docker: command not found\n")
+                status = 127
             elif "version --format" in command_text:
                 channel.send(b"28.0.0\n")
                 status = 0

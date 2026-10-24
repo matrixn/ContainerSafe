@@ -1,3 +1,4 @@
+import { SelectableText } from "../selectable-text.slint";
 import { Button, LineEdit, CheckBox, ComboBox, ScrollView, Palette } from "std-widgets.slint";
 
 component FieldLabel inherits Rectangle {
@@ -8,18 +9,31 @@ component FieldLabel inherits Rectangle {
     HorizontalLayout {
         spacing: 8px;
         alignment: start;
-        Text { text: root.label; color: #e4edf9; font-size: 13px; vertical-alignment: center; }
+        SelectableText { text: root.label; text-color: #e4edf9; font-size: 13px; vertical-alignment: center; }
         Rectangle {
             width: 18px; height: 18px;
             border-radius: 9px; border-width: 1px; border-color: #6885a7;
             background: #21364e;
             accessible-role: button;
             accessible-label: "Help: " + root.help-label + ". " + root.help;
+            accessible-action-default => { help-popup.show(); }
             Text { text: "i"; color: #acd9ff; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { clicked => { help-popup.show(); } }
             Tooltip {
                 VerticalLayout {
                     padding: 12px;
                     Text { width: 320px; text: root.help; color: Palette.foreground; wrap: word-wrap; font-size: 13px; }
+                }
+            }
+            help-popup := PopupWindow {
+                width: 370px;
+                Rectangle {
+                    background: #1b3049;
+                    VerticalLayout { padding: 16px; spacing: 12px;
+                        SelectableText { text: root.help-label; text-color: #f0f6ff; font-weight: 700; wrap: word-wrap; }
+                        SelectableText { text: root.help; text-color: #bfd2e7; wrap: word-wrap; }
+                        Button { text: "Close help"; clicked => { help-popup.close(); } }
+                    }
                 }
             }
         }
@@ -46,7 +60,7 @@ component Hint inherits Rectangle {
     in property <string> text;
     background: #162f44; border-radius: 8px;
     VerticalLayout { padding: 14px;
-        Text { text: root.text; color: #aacae0; wrap: word-wrap; font-size: 12px; }
+        SelectableText { text: root.text; text-color: #aacae0; wrap: word-wrap; font-size: 12px; }
     }
 }
 
@@ -78,11 +92,11 @@ export component ServerForm inherits Rectangle {
         padding: 28px; spacing: 18px;
         HorizontalLayout {
             VerticalLayout { spacing: 5px;
-                Text { text: "Connect a Docker server"; font-size: 24px; font-weight: 700; color: #f0f6ff; }
-                Text { text: "Give it a name. Choose how to sign in. Test, then save."; color: #9eb6cf; font-size: 13px; }
+                SelectableText { text: "Connect a Docker server"; font-size: 24px; font-weight: 700; text-color: #f0f6ff; }
+                SelectableText { text: "Give it a name. Choose how to sign in. Test, then save."; text-color: #9eb6cf; font-size: 13px; }
             }
             Rectangle { horizontal-stretch: 1; }
-            Text { text: "SSH"; color: #74d5ee; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+            SelectableText { text: "SSH"; text-color: #74d5ee; font-size: 12px; font-weight: 700; vertical-alignment: center; }
         }
         HorizontalLayout { spacing: 10px;
             StepTab { label: "1   Connection"; active: root.step == 0; selected => { root.step = 0; } }
@@ -95,7 +109,7 @@ export component ServerForm inherits Rectangle {
                 padding-right: 8px; spacing: 16px;
                 if root.step == 0 : VerticalLayout {
                     spacing: 18px;
-                    Text { text: "Where is your server?"; color: #f0f6ff; font-size: 18px; font-weight: 600; }
+                    SelectableText { text: "Where is your server?"; text-color: #f0f6ff; font-size: 18px; font-weight: 600; }
                     VerticalLayout { spacing: 7px;
                         FieldLabel { label: "Server name"; help: "A friendly name shown only in ContainerSafe, such as Home NAS or Production Docker. It does not rename the remote computer."; }
                         name := LineEdit { text <=> root.server-name; placeholder-text: "e.g. Home NAS"; min-height: 40px; edited => { root.edited(); } }
@@ -156,7 +170,7 @@ export component ServerForm inherits Rectangle {
                 }
                 if root.step == 2 : VerticalLayout {
                     spacing: 16px;
-                    Text { text: "Check access before saving"; color: #f0f6ff; font-size: 18px; font-weight: 600; }
+                    SelectableText { text: "Check access before saving"; text-color: #f0f6ff; font-size: 18px; font-weight: 600; }
                     VerticalLayout { spacing: 7px;
                         FieldLabel { label: "Docker access"; help: "Automatic: try Docker directly, then passwordless sudo if needed. Direct Docker CLI: run Docker as the SSH user, usually with Docker group permissions. Passwordless sudo -n: run Docker through sudo without prompting; the server must already allow this. Your SSH password is never used as a sudo password."; }
                         ComboBox { model: ["Automatic (recommended)", "Direct Docker CLI", "Passwordless sudo -n"]; current-index <=> root.docker-access; selected(value) => { root.edited(); } }
@@ -170,7 +184,8 @@ export component ServerForm inherits Rectangle {
                         background: root.tested ? #153b35 : #192e46; border-radius: 8px;
                         VerticalLayout { padding: 16px; spacing: 8px;
                             FieldLabel { label: root.tested ? "Connection verified" : "Connection check"; help: "Test checks SSH connectivity, server identity, authentication and Docker access, then reads the container inventory. Save becomes available only after a successful test. Changing a field requires a new test. This does not run a backup."; }
-                            Text { text: root.result; wrap: word-wrap; color: root.tested ? #a1e3c5 : #b8cce2; font-size: 12px; }
+                            report := SelectableText { text: root.result; wrap: word-wrap; text-color: root.tested ? #a1e3c5 : #b8cce2; font-size: 12px; }
+                            Button { text: "Copy report"; clicked => { report.copy-all(); } }
                         }
                     }
                 }
@@ -178,7 +193,7 @@ export component ServerForm inherits Rectangle {
             }
         }
         Rectangle { height: 1px; background: #2b4059; }
-        Text { text: root.busy ? "Checking your server..." : root.tested ? "Verified. You can now save this server." : "Save unlocks after a successful connection test."; color: root.tested ? #8cd6b5 : #99b1cc; font-size: 12px; }
+        SelectableText { text: root.busy ? "Checking your server..." : root.tested ? "Verified. You can now save this server." : "Save unlocks after a successful connection test."; text-color: root.tested ? #8cd6b5 : #99b1cc; font-size: 12px; }
         HorizontalLayout { spacing: 10px;
             Button { text: "Cancel"; clicked => { root.cancel(); } }
             if root.step > 0 : Button { text: "Back"; clicked => { root.step -= 1; } }

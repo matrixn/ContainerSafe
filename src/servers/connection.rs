@@ -33,12 +33,57 @@ pub struct Connection {
     session: ssh2::Session,
     docker_prefix: &'static str,
 }
-const DIRECT: [&str; 3] = ["docker", "/usr/bin/docker", "/usr/local/bin/docker"];
-const SUDO: [&str; 3] = [
+const DIRECT: [&str; 5] = [
+    "docker",
+    "/usr/bin/docker",
+    "/usr/local/bin/docker",
+    "/var/packages/ContainerManager/target/usr/bin/docker",
+    "/var/packages/Docker/target/usr/bin/docker",
+];
+const SUDO: [&str; 5] = [
     "sudo -n docker",
     "sudo -n /usr/bin/docker",
     "sudo -n /usr/local/bin/docker",
+    "sudo -n /var/packages/ContainerManager/target/usr/bin/docker",
+    "sudo -n /var/packages/Docker/target/usr/bin/docker",
 ];
+
+// Remote output is untrusted and can contain sensitive data. Only return fixed
+// diagnostic categories, never the raw output (including in failed probes).
+fn docker_failure(status: i32, output: &[u8]) -> String {
+    let text = String::from_utf8_lossy(&output[..output.len().min(16384)]).to_lowercase();
+    let reason = if text.contains("a password is required")
+        || text.contains("no password was provided")
+        || text.contains("a terminal is required")
+    {
+        "sudo requires a password; passwordless sudo -n is not configured for this command"
+    } else if text.contains("must have a tty") || text.contains("no tty present") {
+        "sudo requires an interactive terminal; this SSH connection is non-interactive"
+    } else if text.contains("not in the sudoers")
+        || text.contains("not allowed to execute")
+        || text.contains("may not run sudo")
+    {
+        "sudo policy does not allow this user to run the command"
+    } else if status == 127 || text.contains("command not found") || text.contains(": not found") {
+        "Docker or sudo executable not found at this path"
+    } else if text.contains("permission denied") || text.contains("access denied") {
+        if text.contains("sudo:") {
+            "sudo permission denied before Docker could run; check the remote sudo policy"
+        } else if text.contains("socket") || text.contains("docker daemon") {
+            "permission denied for the Docker daemon socket"
+        } else {
+            "remote shell or executable permission denied; Docker may not have started"
+        }
+    } else if text.contains("cannot connect to the docker daemon")
+        || text.contains("is the docker daemon running")
+        || text.contains("connection refused")
+    {
+        "cannot reach the Docker daemon; check Container Manager / Docker service and endpoint"
+    } else {
+        "command failed; check Docker installation, service and account permissions"
+    };
+    format!("Docker: {reason} (exit {status})")
+}
 
 pub fn verify_host(identity: &HostIdentity, pinned: Option<&str>) -> Result<(), Failure> {
     match pinned {
@@ -120,16 +165,18 @@ impl Connection {
             DockerAccess::Sudo => SUDO.to_vec(),
             DockerAccess::Automatic => DIRECT.into_iter().chain(SUDO).collect(),
         };
+        let mut diagnostics = Vec::new();
         for prefix in candidates {
             connection.docker_prefix = prefix;
-            if connection
-                .docker("version --format '{{.Server.Version}}'")
-                .is_ok()
-            {
-                return Ok(connection);
+            match connection.docker("version --format '{{.Server.Version}}'") {
+                Ok(_) => return Ok(connection),
+                Err(reason) => diagnostics.push(format!("{prefix}: {reason}")),
             }
         }
-        Err(Failure::Message("SSH: Connected\nAuthentication: Successful\nHost identity: Verified\nDocker: Unavailable or permission denied. Check Docker installation, daemon and group access, or select configured passwordless sudo -n.".into()))
+        Err(Failure::Message(format!(
+            "SSH: Connected\nAuthentication: Successful\nHost identity: Verified\nDocker: Access check failed\n\n{}\n\nSSH login does not grant Docker permissions. Passwordless sudo -n never prompts for or uses your SSH password. Check the reported cause on the server, then test again.",
+            diagnostics.join("\n")
+        )))
     }
 
     pub fn docker(&self, arguments: &str) -> Result<String, String> {
@@ -165,15 +212,35 @@ impl Connection {
         channel
             .wait_close()
             .map_err(|_| "SSH: close failed or timed out")?;
-        if channel
+        let status = channel
             .exit_status()
-            .map_err(|_| "Docker: missing exit status")?
-            != 0
-        {
-            return Err(
-                "Docker command failed: unavailable, permission denied, or daemon stopped".into(),
-            );
+            .map_err(|_| "Docker: missing exit status")?;
+        if status != 0 {
+            return Err(docker_failure(status, &output));
         }
         String::from_utf8(output).map_err(|_| "Docker: invalid UTF-8 output".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::docker_failure;
+
+    #[test]
+    fn reports_distinct_actionable_causes_without_remote_output() {
+        let cases: &[(i32, &[u8], &str)] = &[
+            (1, b"sudo: a password is required\nprivate-fixture-marker", "sudo requires a password"),
+            (1, b"user is not in the sudoers file\nprivate-fixture-marker", "sudo policy"),
+            (1, b"sudo: sorry, you must have a tty\nprivate-fixture-marker", "interactive terminal"),
+            (127, b"sh: docker: command not found\nprivate-fixture-marker", "executable not found"),
+            (1, b"permission denied while trying to connect to the Docker daemon socket\nprivate-fixture-marker", "permission denied"),
+            (1, b"Cannot connect to the Docker daemon. Is the docker daemon running?\nprivate-fixture-marker", "cannot reach"),
+            (2, b"private-fixture-marker", "command failed"),
+        ];
+        for (status, output, expected) in cases {
+            let error = docker_failure(*status, output);
+            assert!(error.contains(expected), "{error}");
+            assert!(!error.contains("private-fixture-marker"));
+        }
     }
 }

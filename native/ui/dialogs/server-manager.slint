@@ -1,3 +1,4 @@
+import { SelectableText } from "../selectable-text.slint";
 import { Button, ListView } from "std-widgets.slint";
 export struct ServerRow { name: string, host: string, status: string, last-opened: string, default-server: bool }
 export component ServerManager inherits Rectangle {
@@ -9,12 +10,12 @@ export component ServerManager inherits Rectangle {
     VerticalLayout {
         padding: 22px;
         spacing: 12px;
-        Text { text: "Servers"; font-size: 22px; font-weight: 700; color: #f0f5ff; }
+        SelectableText { text: "Servers"; font-size: 22px; font-weight: 700; text-color: #f0f5ff; }
         HorizontalLayout {
-            Text { color: #e9f2ff; text: "Name"; width: 190px; }
-            Text { color: #e9f2ff; text: "Host"; width: 200px; }
-            Text { color: #e9f2ff; text: "Status"; width: 120px; }
-            Text { color: #e9f2ff; text: "Last opened"; }
+            SelectableText { text-color: #e9f2ff; text: "Name"; width: 190px; }
+            SelectableText { text-color: #e9f2ff; text: "Host"; width: 200px; }
+            SelectableText { text-color: #e9f2ff; text: "Status"; width: 120px; }
+            SelectableText { text-color: #e9f2ff; text: "Last opened"; }
         }
         ListView {
             for server[i] in root.servers: Rectangle {
@@ -22,14 +23,14 @@ export component ServerManager inherits Rectangle {
                 background: root.selected == i ? #244d79 : (Math.mod(i,2) == 0 ? #1c2d43 : #18283d);
                 HorizontalLayout {
                     padding: 8px;
-                    Button { width: 182px; text: (server.default-server ? "★ " : "") + server.name; clicked => { root.selected = i; } }
-                    Text { color: #e9f2ff; text: server.host; width: 200px; overflow: elide; vertical-alignment: center; }
-                    Text { color: #e9f2ff; text: server.status; width: 120px; vertical-alignment: center; }
-                    Text { color: #e9f2ff; text: server.last-opened; vertical-alignment: center; }
+                    SelectableText { width: 182px; text: (server.default-server ? "★ " : "") + server.name; vertical-alignment: center; activated => { root.selected = i; } }
+                    SelectableText { text-color: #e9f2ff; text: server.host; width: 200px; overflow: elide; vertical-alignment: center; }
+                    SelectableText { text-color: #e9f2ff; text: server.status; width: 120px; vertical-alignment: center; }
+                    SelectableText { text-color: #e9f2ff; text: server.last-opened; vertical-alignment: center; }
                 }
             }
         }
-        Text { text: "★ = Default server. Opening a server preserves the default preference."; color: #a8bed8; }
+        SelectableText { text: "★ = Default server. Opening a server preserves the default preference."; text-color: #a8bed8; }
         HorizontalLayout {
             Button { text: "New"; clicked => { root.action("new"); } }
             Button { text: "Edit"; enabled: root.selected >= 0; clicked => { root.action("edit"); } }

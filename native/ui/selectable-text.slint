@@ -1,0 +1,43 @@
+// A display label with the same layout metrics as Text and a read-only
+// selection layer. Focus reveals the full value, including elided content.
+export component SelectableText inherits Rectangle {
+    in property <string> text;
+    in property <brush> text-color: #e9f2ff;
+    in property <length> font-size: 0px;
+    in property <int> font-weight: 400;
+    in property <string> font-family: "";
+    in property <TextWrap> wrap: no-wrap;
+    in property <TextOverflow> overflow: clip;
+    in property <TextHorizontalAlignment> horizontal-alignment: left;
+    in property <TextVerticalAlignment> vertical-alignment: top;
+    out property <bool> has-focus: selection.has-focus;
+    callback activated;
+    changed has-focus => { if root.has-focus { root.activated(); } }
+    clip: true;
+    forward-focus: selection;
+    public function copy-all() { selection.select-all(); selection.copy(); }
+
+    VerticalLayout {
+        padding: 0px;
+        Text {
+            accessible-role: none;
+            visible: !selection.has-focus;
+            text: root.text; color: root.text-color;
+            font-size: root.font-size; font-weight: root.font-weight; font-family: root.font-family;
+            wrap: root.wrap; overflow: root.overflow;
+            horizontal-alignment: root.horizontal-alignment; vertical-alignment: root.vertical-alignment;
+        }
+    }
+    selection := TextInput {
+        width: parent.width; height: parent.height;
+        text: root.text;
+        read-only: true; single-line: false;
+        color: self.has-focus ? root.text-color : transparent;
+        font-size: root.font-size; font-weight: root.font-weight; font-family: root.font-family;
+        wrap: root.wrap;
+        horizontal-alignment: root.horizontal-alignment; vertical-alignment: root.vertical-alignment;
+        selection-background-color: #276a9e;
+        selection-foreground-color: #ffffff;
+        text-cursor-width: 0px;
+    }
+}
