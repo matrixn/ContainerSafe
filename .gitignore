@@ -15,6 +15,7 @@ servers.json
 *.secret
 restic-password*
 secrets/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 __pycache__/

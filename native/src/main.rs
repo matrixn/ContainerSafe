@@ -678,7 +678,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let main_window: Rc<RefCell<Option<ContainerSafeWindow>>> = Rc::new(RefCell::new(None));
     let keep_main = Rc::clone(&main_window);
     let splash_weak = splash.as_weak();
-    let started_at = Instant::now();
+    let mut ready_at: Option<Instant> = None;
     let mut loaded: Option<(State, String)> = None;
     let mut finished = false;
 
@@ -697,16 +697,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     splash.set_loading_message(message.into());
                 }
                 StartupEvent::Loaded(state, message) => {
-                    splash.set_loading_progress(88);
-                    splash.set_loading_message("Pregatesc fereastra principala...".into());
+                    splash.set_loading_progress(100);
+                    splash.set_loading_message("Gata".into());
+                    ready_at = Some(Instant::now());
                     loaded = Some((*state, message));
                 }
             }
         }
 
-        // A short minimum splash lifetime avoids flickering on fast machines.
-        // It does not pretend that additional initialization is occurring.
-        if started_at.elapsed() < Duration::from_millis(950) {
+        // Keep the completed splash visible for 2.5 seconds after loading,
+        // without blocking the event loop or delaying disk I/O.
+        if !ready_at.is_some_and(|ready| ready.elapsed() >= Duration::from_millis(2500)) {
             return;
         }
 

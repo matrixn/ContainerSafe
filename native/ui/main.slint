@@ -474,7 +474,7 @@ export component ContainerSafeWindow inherits Window {
         TouchArea {}
         if root.dialog == 1 : ServerForm {
             x: (parent.width - self.width) / 2; y: 12px;
-            width: 680px; height: parent.height - 24px;
+            width: min(820px, parent.width - 48px); height: parent.height - 24px;
             server-name <=> root.form-name; host <=> root.form-host; port <=> root.form-port;
             username <=> root.form-user; authentication <=> root.form-auth; key-path <=> root.form-key;
             secret <=> root.form-secret; remember <=> root.form-remember; docker-access <=> root.form-docker;

@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.09** · Next releases increment by **0.01** (0.10, 0.11, …).
+**Version 0.10** · Next releases increment by **0.01** (0.11, 0.12, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -119,6 +119,8 @@ Commands use the configured default server, or accept `--server UUID`. There is 
 ```powershell
 cargo run --manifest-path .\native\Cargo.toml
 ```
+
+In VS Code, use **Terminal → Run Task → Run ContainerSafe desktop**. **Ctrl+Shift+B** builds the desktop. Plain `cargo run` in the repository root starts the CLI; without a configured default server or `--server UUID`, it exits with a server-selection message. Use the desktop command above to configure your first server.
 
 After the splash, first launch opens **New Docker Server**. Configure and test SSH, review the host fingerprint, then save. Later launches connect to the default server asynchronously. **File → Servers...** manages profiles and switches servers; the selected server and version are visible in the application bar. Offline servers leave the app open.
 

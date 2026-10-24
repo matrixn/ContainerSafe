@@ -2,6 +2,15 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.10 — 2026-10-24
+
+- Redesigned server setup with Connection, Sign-in and Docker & test tabs, a wider responsive dialog and clearer spacing.
+- Authentication-specific fields, PuTTY export guidance, contextual help tooltips and explanations for Docker access and credential storage.
+- Clear the entered secret when changing authentication methods.
+- Keep the completed splash visible for 2.5 seconds before opening the main window.
+- Added VS Code desktop run/build tasks with an explicit Windows Cargo launcher path and documented the distinction between desktop and CLI startup.
+- Updated the shared application version and Cargo packages to 0.10 / 0.10.0.
+
 ## 0.09 — 2026-10-23
 
 - Automated GitHub installer builds for Windows x64 MSI and Linux amd64 DEB/tar.gz, tag/version validation, dependency notices and SHA-256 checksums. Tag pushes prepare a draft release; publishing attaches rebuilt assets. Main/manual runs create test artifacts only; macOS is deferred.

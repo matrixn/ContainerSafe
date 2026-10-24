@@ -1,4 +1,54 @@
-import { Button, LineEdit, CheckBox, ComboBox, RadioGroup, ScrollView } from "std-widgets.slint";
+import { Button, LineEdit, CheckBox, ComboBox, ScrollView, Palette } from "std-widgets.slint";
+
+component FieldLabel inherits Rectangle {
+    in property <string> label;
+    in property <string> help;
+    in property <string> help-label: label;
+    height: 24px;
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Text { text: root.label; color: #e4edf9; font-size: 13px; vertical-alignment: center; }
+        Rectangle {
+            width: 18px; height: 18px;
+            border-radius: 9px; border-width: 1px; border-color: #6885a7;
+            background: #21364e;
+            accessible-role: button;
+            accessible-label: "Help: " + root.help-label + ". " + root.help;
+            Text { text: "i"; color: #acd9ff; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            Tooltip {
+                VerticalLayout {
+                    padding: 12px;
+                    Text { width: 320px; text: root.help; color: Palette.foreground; wrap: word-wrap; font-size: 13px; }
+                }
+            }
+        }
+    }
+}
+
+component StepTab inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback selected;
+    height: 46px;
+    border-radius: 8px;
+    background: active ? #254a69 : #172a40;
+    border-width: 1px; border-color: active ? #5bc4ed : #2b4059;
+    Text { text: root.label; color: root.active ? #d9f7ff : #a9bdd3; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+    TouchArea { clicked => { root.selected(); } }
+    FocusScope { key-pressed(event) => { if event.text == Key.Return || event.text == " " { root.selected(); return accept; } return reject; } }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.selected(); }
+}
+
+component Hint inherits Rectangle {
+    in property <string> text;
+    background: #162f44; border-radius: 8px;
+    VerticalLayout { padding: 14px;
+        Text { text: root.text; color: #aacae0; wrap: word-wrap; font-size: 12px; }
+    }
+}
 
 export component ServerForm inherits Rectangle {
     in-out property <string> server-name;
@@ -14,71 +64,129 @@ export component ServerForm inherits Rectangle {
     in property <string> result;
     in property <bool> busy;
     in property <bool> tested;
+    private property <int> step: 0;
     callback edited;
     callback browse;
     callback test;
     callback save;
     callback cancel;
-    background: #16263b;
-    border-radius: 8px;
+    background: #122236;
+    border-radius: 14px;
+    border-width: 1px; border-color: #30465f;
+
     VerticalLayout {
-        padding: 22px;
-        spacing: 8px;
-        Text { text: "Docker Server"; font-size: 22px; font-weight: 700; color: #f0f5ff; }
+        padding: 28px; spacing: 18px;
+        HorizontalLayout {
+            VerticalLayout { spacing: 5px;
+                Text { text: "Connect a Docker server"; font-size: 24px; font-weight: 700; color: #f0f6ff; }
+                Text { text: "Give it a name. Choose how to sign in. Test, then save."; color: #9eb6cf; font-size: 13px; }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "SSH"; color: #74d5ee; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+        }
+        HorizontalLayout { spacing: 10px;
+            StepTab { label: "1   Connection"; active: root.step == 0; selected => { root.step = 0; } }
+            StepTab { label: "2   Sign-in"; active: root.step == 1; selected => { root.step = 1; } }
+            StepTab { label: "3   Docker & test"; active: root.step == 2; selected => { root.step = 2; } }
+        }
         ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
-                spacing: 6px;
-                Text { color: #e9f2ff; text: "Server name"; }
-                name := LineEdit { text <=> root.server-name; edited => { root.edited(); } }
-                Text { color: #e9f2ff; text: "Hostname / IP address"; }
-                LineEdit { text <=> root.host; edited => { root.edited(); } }
-                HorizontalLayout {
-                    Text { color: #e9f2ff; text: "SSH port"; }
-                    LineEdit { text <=> root.port; input-type: number; edited => { root.edited(); } }
-                    Text { color: #e9f2ff; text: "Timeout (s)"; }
-                    LineEdit { text <=> root.timeout; input-type: number; edited => { root.edited(); } }
+                padding-right: 8px; spacing: 16px;
+                if root.step == 0 : VerticalLayout {
+                    spacing: 18px;
+                    Text { text: "Where is your server?"; color: #f0f6ff; font-size: 18px; font-weight: 600; }
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "Server name"; help: "A friendly name shown only in ContainerSafe, such as Home NAS or Production Docker. It does not rename the remote computer."; }
+                        name := LineEdit { text <=> root.server-name; placeholder-text: "e.g. Home NAS"; min-height: 40px; edited => { root.edited(); } }
+                    }
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "Hostname or IP address"; help: "The address of the computer running Docker, for example nas.local or 192.168.1.20. Enter only the hostname or IP, without https://, an SSH username, port or folder path."; }
+                        LineEdit { text <=> root.host; placeholder-text: "e.g. nas.local or 192.168.1.20"; min-height: 40px; edited => { root.edited(); } }
+                    }
+                    HorizontalLayout { spacing: 20px;
+                        VerticalLayout { spacing: 7px;
+                            FieldLabel { label: "SSH port"; help: "The port used by the server's SSH service. Usually 22. Change it only if your SSH service or port forwarding uses another port. Valid range: 1-65535."; }
+                            LineEdit { text <=> root.port; min-height: 40px; edited => { root.edited(); } }
+                        }
+                        Hint { text: "Use the same address and port you would use in PuTTY or an SSH terminal."; }
+                    }
+                    Hint { text: "SSH must already be enabled on this server. ContainerSafe will ask you to review its identity before signing in for the first time."; }
                 }
-                Text { color: #e9f2ff; text: "SSH username"; }
-                LineEdit { text <=> root.username; edited => { root.edited(); } }
-                RadioGroup {
-                    orientation: vertical;
-                    selected(value) => {
-                        if (value == "Username & Password" && root.authentication != 0) || (value == "OpenSSH Private Key" && root.authentication != 2) || (value != "Username & Password" && value != "OpenSSH Private Key" && root.authentication != 1) {
-                            root.authentication = value == "Username & Password" ? 0 : value == "OpenSSH Private Key" ? 2 : 1;
-                            root.edited();
+                if root.step == 1 : VerticalLayout {
+                    spacing: 16px;
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "SSH username"; help: "An existing login account on the remote server, such as your NAS user. This is not your Docker Hub account. The account must be allowed to use SSH and access Docker."; }
+                        LineEdit { text <=> root.username; placeholder-text: "Your remote server account"; min-height: 40px; edited => { root.edited(); } }
+                    }
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "How do you sign in?"; help: "Password: use your remote account password. OpenSSH key: use a private key file stored on this computer; its public key must be installed on the server. PuTTY (.ppk): follow the export guide to convert your key to supported OpenSSH format first."; }
+                        ComboBox {
+                            model: ["Account password", "PuTTY key (.ppk) - export guide", "OpenSSH private key"];
+                            current-index <=> root.authentication;
+                            selected(value) => { root.secret = ""; root.edited(); }
                         }
                     }
-                    RadioButton { text: "Username & Password"; checked: root.authentication == 0; }
-                    RadioButton { text: "PuTTY Private Key (.ppk) — encrypted export integration"; checked: root.authentication == 1; }
-                    RadioButton { text: "OpenSSH Private Key"; checked: root.authentication == 2; }
+                    if root.authentication == 0 : Hint { text: "Password login uses the password of your SSH account on the remote server."; }
+                    if root.authentication == 2 : VerticalLayout {
+                        spacing: 7px;
+                        FieldLabel { label: "Private key file"; help: "Choose your private OpenSSH key on this computer, not its .pub public-key file. The matching public key must be in the remote user's authorized_keys. Your private key file is not uploaded to the server."; }
+                        HorizontalLayout { spacing: 10px;
+                            LineEdit { text <=> root.key-path; placeholder-text: "Choose a private key on this computer"; min-height: 40px; edited => { root.edited(); } }
+                            Button { text: "Browse..."; clicked => { root.browse(); } Tooltip { text: @markdown("Choose your existing private key file. No file is uploaded."); } }
+                        }
+                    }
+                    if root.authentication == 1 : VerticalLayout {
+                        spacing: 14px;
+                        Hint { text: "Already using PuTTY? Export your key once\n\n1. Open the .ppk file in PuTTYgen.\n2. Keep a passphrase and choose Conversions > Export OpenSSH key.\n3. Save the exported private key on this computer.\n4. Choose OpenSSH below and browse to that exported file.\n\nPPK files cannot be used directly. Your original key is unchanged."; }
+                        Button { text: "Use my exported OpenSSH key"; clicked => { root.authentication = 2; root.secret = ""; root.edited(); } }
+                    }
+                    if root.authentication != 1 : VerticalLayout {
+                        spacing: 7px;
+                        FieldLabel {
+                            label: root.authentication == 0 ? "Account password" : "Key passphrase (optional)";
+                            help: root.authentication == 0 ? "The password for the SSH username above. It is sent only through the encrypted SSH connection after you approve the server identity. It is not your Windows password unless both accounts happen to use the same password." : "The password that unlocks this private key file, which can differ from your server account password. Leave blank only if the key is not encrypted.";
+                        }
+                        LineEdit { text <=> root.secret; input-type: password; min-height: 40px; edited => { root.edited(); } }
+                        HorizontalLayout { spacing: 10px; alignment: start;
+                            CheckBox { horizontal-stretch: 0; text: "Remember on this computer"; checked <=> root.remember; toggled => { root.edited(); } }
+                            FieldLabel { width: 26px; help-label: "Remember on this computer"; label: ""; help: "Enabled: store the password or key passphrase in the operating-system credential store. Disabled: keep it only for this app session; you must enter it again next time. The profile itself never contains the password. A private key file stays where you selected it."; }
+                        }
+                    }
                 }
-                if root.authentication != 0 : HorizontalLayout {
-                    LineEdit { text <=> root.key-path; placeholder-text: "Private key path"; edited => { root.edited(); } }
-                    Button { text: "Browse..."; clicked => { root.browse(); } }
+                if root.step == 2 : VerticalLayout {
+                    spacing: 16px;
+                    Text { text: "Check access before saving"; color: #f0f6ff; font-size: 18px; font-weight: 600; }
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "Docker access"; help: "Automatic: try Docker directly, then passwordless sudo if needed. Direct Docker CLI: run Docker as the SSH user, usually with Docker group permissions. Passwordless sudo -n: run Docker through sudo without prompting; the server must already allow this. Your SSH password is never used as a sudo password."; }
+                        ComboBox { model: ["Automatic (recommended)", "Direct Docker CLI", "Passwordless sudo -n"]; current-index <=> root.docker-access; selected(value) => { root.edited(); } }
+                        Hint { text: root.docker-access == 0 ? "Automatic tries direct access first, then passwordless sudo. A good starting point if you are unsure." : root.docker-access == 1 ? "Use the SSH user's existing Docker permissions. No sudo is attempted." : "Use existing passwordless sudo permissions. ContainerSafe cannot answer a sudo password prompt or grant permissions."; }
+                    }
+                    VerticalLayout { spacing: 7px;
+                        FieldLabel { label: "Connection timeout (seconds)"; help: "How long SSH network operations may wait before reporting a timeout. Default: 10 seconds. Increase for a slow or distant server. Valid range: 1-120 seconds. This does not schedule backups."; }
+                        LineEdit { text <=> root.timeout; min-height: 40px; edited => { root.edited(); } }
+                    }
+                    Rectangle {
+                        background: root.tested ? #153b35 : #192e46; border-radius: 8px;
+                        VerticalLayout { padding: 16px; spacing: 8px;
+                            FieldLabel { label: root.tested ? "Connection verified" : "Connection check"; help: "Test checks SSH connectivity, server identity, authentication and Docker access, then reads the container inventory. Save becomes available only after a successful test. Changing a field requires a new test. This does not run a backup."; }
+                            Text { text: root.result; wrap: word-wrap; color: root.tested ? #a1e3c5 : #b8cce2; font-size: 12px; }
+                        }
+                    }
                 }
-                if root.authentication != 0 : Text {
-                    text: "Your private key stays on this computer. Its public key must be authorized on the remote server.";
-                    wrap: word-wrap; color: #a8bed8; font-size: 11px;
-                }
-                if root.authentication == 1 : Text {
-                    text: "Open the PPK in PuTTYgen, export an encrypted OpenSSH key, then choose OpenSSH above. No automatic conversion.";
-                    wrap: word-wrap; color: #efbf70;
-                }
-                Text { color: #e9f2ff; text: root.authentication == 0 ? "Password" : "Key passphrase (optional)"; }
-                LineEdit { text <=> root.secret; input-type: password; edited => { root.edited(); } }
-                CheckBox { text: "Remember in operating-system credential store"; checked <=> root.remember; toggled => { root.edited(); } }
-                Text { color: #e9f2ff; text: "Docker access"; }
-                ComboBox { model: ["Automatic", "Direct Docker CLI", "Passwordless sudo -n"]; current-index <=> root.docker-access; selected(value) => { root.edited(); } }
-                Text { text: root.result; wrap: word-wrap; color: #b7d1ee; min-height: 60px; }
+                Rectangle { vertical-stretch: 1; }
             }
         }
-        HorizontalLayout {
-            Button { text: root.busy ? "Testing..." : "Test Connection"; enabled: !root.busy; clicked => { root.test(); } }
-            Rectangle { horizontal-stretch: 1; }
+        Rectangle { height: 1px; background: #2b4059; }
+        Text { text: root.busy ? "Checking your server..." : root.tested ? "Verified. You can now save this server." : "Save unlocks after a successful connection test."; color: root.tested ? #8cd6b5 : #99b1cc; font-size: 12px; }
+        HorizontalLayout { spacing: 10px;
             Button { text: "Cancel"; clicked => { root.cancel(); } }
-            Button { text: "Save"; enabled: root.tested && !root.busy; clicked => { root.save(); } }
+            if root.step > 0 : Button { text: "Back"; clicked => { root.step -= 1; } }
+            Rectangle { horizontal-stretch: 1; }
+            if root.step < 2 : Button { text: "Continue"; clicked => { root.step += 1; } }
+            if root.step == 2 : Button { text: root.busy ? "Testing..." : "Test connection"; enabled: !root.busy && root.authentication != 1; clicked => { root.test(); } }
+            Button { text: "Save server"; enabled: root.tested && !root.busy; clicked => { root.save(); } Tooltip { text: @markdown("Save this profile after a successful connection test. Changes require testing again."); } }
         }
     }
-    public function focus-first() { name.focus(); }
+    public function focus-first() { root.step = 0; }
 }
