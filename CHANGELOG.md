@@ -2,6 +2,14 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.12 — 2026-10-24
+
+- Implement the reusable Restic engine planned in the original v0.8 discussion: typed local init, backup, snapshots, check and isolated restore operations shared by the CLI, desktop core and future agent.
+- Separate repository configuration from session secrets, configure the executable explicitly, parse JSON results, bound child-process execution and return structured errors without raw process output or passwords.
+- Require exact snapshot IDs and new restore directories, reject repository/source overlap, and verify restored content with Restic. Normalize Windows extended path prefixes for consistent snapshot trees.
+- Refactor the local lab onto the shared engine, replace the hard-coded password with a random ephemeral secret, and compare restored bytes for both snapshot versions plus an older snapshot restored again.
+- Add process/error/path guard tests, an optional real-Restic integration test and Romanian test instructions. Production Docker backups, Linux agent, destination UI and scheduling remain future milestones.
+
 ## 0.11 — 2026-10-24
 
 - Use native WinCNG for Windows SSH, removing Windows OpenSSL/Perl build requirements while preserving vendored OpenSSL on Linux/macOS. Report WinCNG key-format limitations explicitly and test encrypted RSA PEM authentication without weakening host-key verification.

@@ -15,7 +15,13 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     if mode == "lab-backup" {
-        return containersafe::restic_lab::run();
+        return match &args[1..] {
+            [] => containersafe::restic_lab::run(),
+            [option, path] if option == "--restic" => {
+                containersafe::restic_lab::run_with_executable(path)
+            }
+            _ => Err("Usage: containersafe lab-backup [--restic PATH_TO_EXECUTABLE]".into()),
+        };
     }
     let root = storage::config_root().map_err(io::Error::other)?;
     let profiles = Profiles::load(&root).map_err(io::Error::other)?;

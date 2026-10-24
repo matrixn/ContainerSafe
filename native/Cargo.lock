@@ -840,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "containersafe"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "base64 0.22.1",
  "directories",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "containersafe-native"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chrono",
  "containersafe",

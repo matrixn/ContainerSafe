@@ -1,173 +1,142 @@
-use std::error::Error;
-use std::ffi::OsStr;
-use std::fs;
-use std::io;
-use std::path::Path;
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+//! Disposable local demonstration of the shared Restic engine.
+use crate::restic::{RepositoryConfig, RepositorySecret, ResticEngine};
+use std::{
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
+use uuid::Uuid;
 
-// EXCLUSIV pentru date fictive, create local.
-// Nu folosim aceasta parola pentru backupuri reale.
-const LAB_PASSWORD: &str = "containersafe-disposable-lab-only";
+pub fn run() -> Result<(), Box<dyn Error>> {
+    run_with_executable(
+        std::env::var_os("CONTAINERSAFE_RESTIC")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| "restic".into()),
+    )
+}
 
-fn restic(repo: &Path, args: &[&OsStr]) -> Result<(), Box<dyn Error>> {
-    let output = Command::new("restic")
-        .arg("--repo")
-        .arg(repo)
-        .args(args)
-        .env("RESTIC_PASSWORD", LAB_PASSWORD)
-        .output()?;
+// Only a path within the snapshot, never a host restore destination.
+fn subtree(path: &str) -> String {
+    if cfg!(windows) {
+        let path = path.strip_prefix(r"\\?\").unwrap_or(path);
+        format!(
+            "/{}",
+            path.replace('\\', "/")
+                .replace(':', "")
+                .trim_start_matches('/')
+        )
+    } else {
+        path.to_owned()
+    }
+}
 
-    if !output.status.success() {
-        return Err(io::Error::other(format!(
-            "Restic failed (exit code: {:?}): {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr)
-        ))
-        .into());
+pub fn run_with_executable(executable: impl Into<PathBuf>) -> Result<(), Box<dyn Error>> {
+    let lab = tempfile::Builder::new()
+        .prefix("containersafe-lab-")
+        .tempdir()?
+        .keep();
+    let source = lab.join("source data; literal");
+    fs::create_dir(&source)?;
+    let original = source.join("containersafe-fixture.txt");
+    let first = b"ContainerSafe: backup and restore test.\n";
+    let second = b"ContainerSafe: backup and restore test.\nVersion 2.\n";
+    fs::write(&original, first)?;
+
+    let reference = Uuid::new_v4();
+    let config = RepositoryConfig {
+        path: lab.join("repository"),
+        secret_reference: reference,
+    };
+    // Random, session-only credentials for synthetic data. Never printed or saved.
+    let secret = RepositorySecret::new(reference, format!("{}{}", Uuid::new_v4(), Uuid::new_v4()))?;
+    let engine = ResticEngine::new(executable)?;
+    println!(
+        "ContainerSafe {} - reusable Restic Engine lab",
+        crate::VERSION
+    );
+    println!("Disposable local files: {}", lab.display());
+    println!("No SSH connection or production Docker data is used.");
+
+    println!("[1/7] Initialize encrypted repository");
+    engine.init(&config, &secret)?;
+    if !engine.snapshots(&config, &secret)?.is_empty() {
+        return Err("New repository unexpectedly contains snapshots".into());
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if !stdout.trim().is_empty() {
-        println!("{stdout}");
-    }
+    println!("[2/7] Create first snapshot");
+    let backup1 = engine.backup(&config, &secret, std::slice::from_ref(&source))?;
+    println!("[3/7] Verify all repository data");
+    let check1 = engine.check(&config, &secret, true)?;
+    let snapshots = engine.snapshots(&config, &secret)?;
+    let snapshot1 = snapshots
+        .iter()
+        .find(|s| s.id == backup1.snapshot_id)
+        .ok_or("First snapshot missing")?;
+    let source_tree = subtree(
+        snapshot1
+            .paths
+            .first()
+            .ok_or("Snapshot source path missing")?,
+    );
 
+    println!("[4/7] Restore first snapshot to a new directory and compare bytes");
+    let restore1 = engine.restore(
+        &config,
+        &secret,
+        &backup1.snapshot_id,
+        Some(&source_tree),
+        &lab.join("restored-v1"),
+    )?;
+    compare(&restore1.target.join("containersafe-fixture.txt"), first)?;
+
+    println!("[5/7] Modify synthetic data and create incremental snapshot");
+    fs::write(&original, second)?;
+    let backup2 = engine.backup(&config, &secret, std::slice::from_ref(&source))?;
+    if backup1.snapshot_id == backup2.snapshot_id {
+        return Err("Second snapshot did not get a new identity".into());
+    }
+    println!("[6/7] Verify repository and restore the second snapshot separately");
+    let check2 = engine.check(&config, &secret, true)?;
+    let restore2 = engine.restore(
+        &config,
+        &secret,
+        &backup2.snapshot_id,
+        Some(&source_tree),
+        &lab.join("restored-v2"),
+    )?;
+    compare(&restore2.target.join("containersafe-fixture.txt"), second)?;
+    compare(&restore1.target.join("containersafe-fixture.txt"), first)?;
+
+    println!("[7/7] Restore the older snapshot again after the incremental backup");
+    let old = engine.restore(
+        &config,
+        &secret,
+        &backup1.snapshot_id,
+        Some(&source_tree),
+        &lab.join("restored-old-again"),
+    )?;
+    compare(&old.target.join("containersafe-fixture.txt"), first)?;
+    let snapshots = engine.snapshots(&config, &secret)?;
+    if snapshots.len() != 2 {
+        return Err("Expected exactly two snapshots".into());
+    }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "snapshots": snapshots, "backups": [backup1, backup2],
+            "repository_checks": [check1, check2], "restores": [restore1, restore2, old],
+            "byte_comparisons_passed": true
+        }))?
+    );
+    println!("[PASS] Two snapshots, full repository checks and three isolated restores verified.");
+    println!("Fixture files retained at: {}", lab.display());
+    println!("The disposable repository password was not saved; this repository is only for this lab run.");
     Ok(())
 }
 
-pub fn run() -> Result<(), Box<dyn Error>> {
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-
-    // Director nou si unic, in spatiul temporar Windows.
-    let lab = std::env::temp_dir().join(format!(
-        "containersafe-lab-{}-{timestamp}",
-        std::process::id()
-    ));
-
-    fs::create_dir(&lab)?;
-
-    let source = lab.join("source");
-    let repo = lab.join("repository");
-    let restored = lab.join("restored");
-
-    fs::create_dir(&source)?;
-    fs::create_dir(&restored)?;
-
-    let filename = "containersafe-fixture.txt";
-    let original = source.join(filename);
-    let expected = b"ContainerSafe: backup and restore test.\n";
-
-    fs::write(&original, expected)?;
-
-    println!("ContainerSafe v{} - Restic Lab", crate::VERSION);
-    println!("Local test directory: {}", lab.display());
-    println!("No Synology connection will be used.");
-
-    // 1. Repository criptat.
-    println!("\n[1/4] Initializing repository...");
-    restic(&repo, &[OsStr::new("init")])?;
-
-    // 2. Backup fisier fictiv.
-    println!("\n[2/4] Creating encrypted backup...");
-    restic(&repo, &[OsStr::new("backup"), source.as_os_str()])?;
-
-    // 3. Citim si verificam datele repository-ului.
-    println!("\n[3/4] Checking repository integrity...");
-    restic(&repo, &[OsStr::new("check"), OsStr::new("--read-data")])?;
-
-    // 4. Restaurare izolata.
-
-    // Convertim calea Windows intr-o cale din snapshot.
-    // Exemplu:
-    // C:\Users\...\source -> /C/Users/.../source
-    //
-    // Aceasta conversie este specifica laboratorului Windows.
-    let source_in_snapshot = source.to_string_lossy().replace('\\', "/").replace(':', "");
-
-    let snapshot_subtree = format!("latest:/{}", source_in_snapshot.trim_start_matches('/'));
-
-    println!("Restoring subtree: {snapshot_subtree}");
-
-    restic(
-        &repo,
-        &[
-            OsStr::new("restore"),
-            OsStr::new(&snapshot_subtree),
-            OsStr::new("--target"),
-            restored.as_os_str(),
-        ],
-    )?;
-
-    let recovered = restored.join(filename);
-
-    if !recovered.is_file() {
-        return Err("Restored test file was not found".into());
+fn compare(path: &Path, expected: &[u8]) -> Result<(), Box<dyn Error>> {
+    if fs::read(path)? != expected {
+        return Err("Restored fixture content differs from the expected snapshot".into());
     }
-    let actual = fs::read(&recovered)?;
-
-    if actual != expected {
-        return Err(io::Error::other("Restored content differs from the original").into());
-    }
-
-    // 5. Simulam o modificare a fisierului.
-    println!("\n[5/7] Updating test file...");
-
-    let updated_content = b"ContainerSafe: backup and restore test.\nVersion 2.\n";
-
-    fs::write(&original, updated_content)?;
-
-    // 6. Cream un al doilea snapshot in acelasi repository.
-    println!("\n[6/7] Creating incremental snapshot...");
-
-    restic(&repo, &[OsStr::new("backup"), source.as_os_str()])?;
-
-    // Verificam si datele celui de-al doilea snapshot.
-    restic(&repo, &[OsStr::new("check"), OsStr::new("--read-data")])?;
-
-    // 7. Restauram ultima versiune separat de prima.
-    println!("\n[7/7] Restoring latest version...");
-
-    let restored_v2 = lab.join("restored-v2");
-    fs::create_dir(&restored_v2)?;
-
-    restic(
-        &repo,
-        &[
-            OsStr::new("restore"),
-            OsStr::new(&snapshot_subtree),
-            OsStr::new("--target"),
-            restored_v2.as_os_str(),
-        ],
-    )?;
-
-    let recovered_v2 = restored_v2.join(filename);
-
-    if !recovered_v2.is_file() {
-        return Err("Second restored file was not found".into());
-    }
-
-    if fs::read(&recovered_v2)? != updated_content {
-        return Err("Second snapshot content mismatch".into());
-    }
-
-    // Prima restaurare trebuie sa ramana neschimbata.
-    if fs::read(&recovered)? != expected {
-        return Err("First restored version was modified".into());
-    }
-
-    println!("\n[PASS] Incremental snapshot created");
-    println!("[PASS] Latest version restored");
-    println!("[PASS] Previous restored version preserved");
-
-    println!("\n==================================");
-    println!("[PASS] Repository initialized");
-    println!("[PASS] Backup created");
-    println!("[PASS] Repository data checked");
-    println!("[PASS] File restored and compared");
-    println!("==================================");
-
-    println!("Test files retained at:");
-    println!("{}", lab.display());
-
     Ok(())
 }

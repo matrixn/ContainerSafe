@@ -1,5 +1,6 @@
 pub mod plan;
 pub mod preflight;
+pub mod restic;
 pub mod restic_lab;
 pub mod selection;
 
@@ -7,7 +8,7 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub mod servers;
-pub const VERSION: &str = "0.11";
+pub const VERSION: &str = "0.12";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {

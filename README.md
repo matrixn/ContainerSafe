@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.11** · Next releases increment by **0.01** (0.12, 0.13, …).
+**Version 0.12** · Next releases increment by **0.01** (0.13, 0.14, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -92,7 +92,7 @@ Installer builds run only when a version tag (`v*`) is pushed. Ordinary commits 
 - **Rust and Cargo** (a toolchain compatible with Slint 1.18).
 - **Windows:** Visual Studio C++ Build Tools / MSVC and Windows SDK. SSH uses native WinCNG; OpenSSL and Perl are not required. Private-key login requires an RSA key in traditional PEM format (encrypted keys are supported); Ed25519, ECDSA, PKCS#8 and modern OpenSSH key containers are unsupported by the locked WinCNG backend. See [SSH compatibility](docs/SERVER_MANAGEMENT.md#credentials-and-keys).
 - **For Docker discovery:** an SSH-accessible Docker host and an account permitted to query Docker. Configure a server in the native app first. Connections pin the host key before authentication; Docker access is discovered using a restricted command list.
-- **For the standalone local Restic lab:** `restic` available on `PATH`.
+- **For the local Restic engine/lab:** a Restic executable (validated with 0.19.1), configured explicitly or available on `PATH`.
 
 ### 1. Clone and build
 
@@ -132,10 +132,12 @@ Profiles live in `%APPDATA%\ContainerSafe\servers.json` on Windows, with per-ser
 
 ```powershell
 restic version
-cargo run -- lab-backup
+cargo run --locked -- lab-backup
+# Or choose the executable explicitly:
+cargo run --locked -- lab-backup --restic C:\Users\radut\bin\restic.exe
 ```
 
-**Lab only:** the command creates disposable fixture data in a temporary Windows directory and tests Restic against that data. The lab's hard-coded demonstration password is **not suitable for real data**.
+**Lab only:** this command uses the shared, typed Restic engine on disposable local files. It creates two snapshots, checks all repository data and verifies three isolated restores by comparing bytes. It uses a random session-only password, which is never saved or printed. The retained fixture directories are inspectable, but their disposable encrypted repository cannot be reopened after the lab exits. No server connection or production Docker data is used. `CONTAINERSAFE_RESTIC` can also select the executable. See [the v0.12 engine scope and Romanian test instructions](docs/RESTIC_ENGINE.md).
 
 ## Example workflow
 
@@ -158,6 +160,7 @@ cargo run -- lab-backup
 - [x] Backup readiness analysis and JSON plans
 - [x] Selection validation with risky-source checks
 - [x] Local Restic backup, integrity check, incremental snapshot, and restore test
+- [x] Reusable typed local Restic engine with secret references and guarded isolated restores
 - [x] Native Slint desktop prototype
 - [x] Shared Rust core for CLI and desktop, explicit server UUIDs and isolated local data
 - [x] Server manager, pinned SSH identities, OS credentials and default-server startup
