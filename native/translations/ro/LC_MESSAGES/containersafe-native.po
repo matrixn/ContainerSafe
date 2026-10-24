@@ -70,12 +70,6 @@ msgstr "Accesul Docker implicit"
 msgid "Automatic tries direct Docker, then passwordless sudo. Direct uses the SSH account. Sudo requires existing passwordless permissions."
 msgstr "Automat încearcă Docker direct, apoi sudo fără parolă. Direct folosește contul SSH. Sudo necesită permisiuni fără parolă deja configurate."
 
-msgid "Connect on startup"
-msgstr "Conectare la pornire"
-
-msgid "On: connect to your saved default server at launch. Off: open the workspace and connect manually through Servers. Host identity is always checked."
-msgstr "Activat: conectează serverul implicit la pornire. Dezactivat: deschide interfața și conectează manual din Servere. Identitatea serverului este verificată întotdeauna."
-
 msgid "On"
 msgstr "Activat"
 
@@ -229,14 +223,8 @@ msgstr "Fără backup selectat"
 msgid "Excluded items"
 msgstr "Elemente excluse"
 
-msgid "Eligible plans"
-msgstr "Planuri eligibile"
-
 msgid "Review your backup selections"
 msgstr "Verifică selecțiile de backup"
-
-msgid "Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate."
-msgstr "Sunt afișate doar grupurile și containerele cu o metodă de backup selectabilă. Verifică planul, salvează modificările, apoi validează."
 
 msgid "STACK / CONTAINER"
 msgstr "GRUP / CONTAINER"
@@ -258,9 +246,6 @@ msgstr "Verifică"
 
 msgid "Connect a server and discover its containers first."
 msgstr "Conectează mai întâi un server și descoperă containerele."
-
-msgid "No selectable backup methods are available for the discovered containers. See Containers for source and database explanations."
-msgstr "Containerele descoperite nu au metode de backup selectabile. Consultă explicațiile din Containere pentru surse și baze de date."
 
 msgid "Planning only · No scheduled or production backups have been created."
 msgstr "Doar planificare · Nu au fost create backupuri programate sau de producție."
@@ -771,4 +756,19 @@ msgstr "Conectat la {0} · salvează selecțiile de backup reconciliate"
 
 msgid "Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact."
 msgstr "Elimini {0} ({1}) și datele sale de autentificare memorate? Datele de pe server și fișierele cheilor private rămân intacte."
+
+msgid "Active plans"
+msgstr "Planuri active"
+
+msgid "Only stacks and containers with at least one enabled backup are shown. Turning off the last backup removes the plan immediately."
+msgstr "Sunt afișate doar grupurile și containerele cu cel puțin un backup activat. Dezactivarea ultimului backup elimină imediat planul."
+
+msgid "No backups are enabled. Open Containers and select Include or Logical dump to create a plan."
+msgstr "Nu există backupuri activate. Deschide Containere și alege Include sau Export logic pentru a crea un plan."
+
+msgid "Reconnect to last server"
+msgstr "Reconectare la ultimul server"
+
+msgid "Off by default: show your saved servers at startup, or Add server if none exist. On: reconnect to the last successfully opened server. Host identity is always checked."
+msgstr "Dezactivat implicit: afișează serverele salvate la pornire sau formularul de adăugare dacă lista este goală. Activat: reconectează ultimul server deschis cu succes. Identitatea serverului este verificată întotdeauna."
 

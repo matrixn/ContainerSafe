@@ -21,8 +21,6 @@
   "120 seconds": "120 de secunde",
   "Default Docker access": "Accesul Docker implicit",
   "Automatic tries direct Docker, then passwordless sudo. Direct uses the SSH account. Sudo requires existing passwordless permissions.": "Automat încearcă Docker direct, apoi sudo fără parolă. Direct folosește contul SSH. Sudo necesită permisiuni fără parolă deja configurate.",
-  "Connect on startup": "Conectare la pornire",
-  "On: connect to your saved default server at launch. Off: open the workspace and connect manually through Servers. Host identity is always checked.": "Activat: conectează serverul implicit la pornire. Dezactivat: deschide interfața și conectează manual din Servere. Identitatea serverului este verificată întotdeauna.",
   "On": "Activat",
   "Off": "Dezactivat",
   "Settings could not be loaded. The original file is preserved; editing is disabled.": "Setările nu au putut fi încărcate. Fișierul original este păstrat; editarea este dezactivată.",
@@ -74,9 +72,7 @@
   "Selected operations": "Operații selectate",
   "No backup selected": "Fără backup selectat",
   "Excluded items": "Elemente excluse",
-  "Eligible plans": "Planuri eligibile",
   "Review your backup selections": "Verifică selecțiile de backup",
-  "Only stacks and containers with an available backup selection method are shown. Review a plan, save your changes, then validate.": "Sunt afișate doar grupurile și containerele cu o metodă de backup selectabilă. Verifică planul, salvează modificările, apoi validează.",
   "STACK / CONTAINER": "GRUP / CONTAINER",
   "SELECTED": "SELECTATE",
   "EXCLUDED": "EXCLUSE",
@@ -84,7 +80,6 @@
   " containers": " containere",
   "Review": "Verifică",
   "Connect a server and discover its containers first.": "Conectează mai întâi un server și descoperă containerele.",
-  "No selectable backup methods are available for the discovered containers. See Containers for source and database explanations.": "Containerele descoperite nu au metode de backup selectabile. Consultă explicațiile din Containere pentru surse și baze de date.",
   "Planning only · No scheduled or production backups have been created.": "Doar planificare · Nu au fost create backupuri programate sau de producție.",
   "No backup activity yet": "Încă nu există activitate de backup",
   "Discover your containers, review storage and save your selections. Production scheduling is not enabled.": "Descoperă containerele, verifică stocarea și salvează selecțiile. Programarea în producție nu este activată.",
@@ -254,5 +249,10 @@
   "Open failed: {0}": "Deschiderea a eșuat: {0}",
   "Profile saved, but opening failed: {0}": "Profil salvat, dar deschiderea a eșuat: {0}",
   "Connected to {0} · save reconciled backup selections": "Conectat la {0} · salvează selecțiile de backup reconciliate",
-  "Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact.": "Elimini {0} ({1}) și datele sale de autentificare memorate? Datele de pe server și fișierele cheilor private rămân intacte."
+  "Remove {0} ({1}) and its stored credentials? Remote data and private-key files stay intact.": "Elimini {0} ({1}) și datele sale de autentificare memorate? Datele de pe server și fișierele cheilor private rămân intacte.",
+  "Active plans": "Planuri active",
+  "Only stacks and containers with at least one enabled backup are shown. Turning off the last backup removes the plan immediately.": "Sunt afișate doar grupurile și containerele cu cel puțin un backup activat. Dezactivarea ultimului backup elimină imediat planul.",
+  "No backups are enabled. Open Containers and select Include or Logical dump to create a plan.": "Nu există backupuri activate. Deschide Containere și alege Include sau Export logic pentru a crea un plan.",
+  "Reconnect to last server": "Reconectare la ultimul server",
+  "Off by default: show your saved servers at startup, or Add server if none exist. On: reconnect to the last successfully opened server. Host identity is always checked.": "Dezactivat implicit: afișează serverele salvate la pornire sau formularul de adăugare dacă lista este goală. Activat: reconectează ultimul server deschis cu succes. Identitatea serverului este verificată întotdeauna."
 }

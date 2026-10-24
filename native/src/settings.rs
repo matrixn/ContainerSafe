@@ -12,7 +12,9 @@ pub(super) struct Preferences {
     ssh_port: usize,
     timeout: usize,
     docker: usize,
-    auto_connect: usize,
+    auto_connect_last_server: usize,
+    #[serde(default, skip_serializing)]
+    auto_connect: Option<usize>,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -24,7 +26,8 @@ impl Default for Preferences {
             ssh_port: 0,
             timeout: 0,
             docker: 0,
-            auto_connect: 1,
+            auto_connect_last_server: 0,
+            auto_connect: None,
         }
     }
 }
@@ -41,7 +44,7 @@ impl Preferences {
             self.ssh_port,
             self.timeout,
             self.docker,
-            self.auto_connect,
+            self.auto_connect_last_server,
         ]
     }
     fn from_choices(values: [usize; 7]) -> Result<Self, String> {
@@ -56,7 +59,8 @@ impl Preferences {
             ssh_port: values[3],
             timeout: values[4],
             docker: values[5],
-            auto_connect: values[6],
+            auto_connect_last_server: values[6],
+            auto_connect: None,
         })
     }
     pub(super) fn load(root: &Path) -> Result<Self, String> {
@@ -85,7 +89,7 @@ fn rows(value: &Preferences, states: &[i32; 7]) -> ModelRc<PreferenceEntry> {
         ("Default SSH port", "Used when adding a new server. Existing profiles keep their own port.", &["22", "2022", "2222"]),
         ("Default connection timeout", "Maximum wait for SSH network operations on new profiles. Existing profiles are unchanged.", &["10 seconds", "30 seconds", "60 seconds", "120 seconds"]),
         ("Default Docker access", "Automatic tries direct Docker, then passwordless sudo. Direct uses the SSH account. Sudo requires existing passwordless permissions.", &["Automatic (recommended)", "Direct Docker CLI", "Passwordless sudo -n"]),
-        ("Connect on startup", "On: connect to your saved default server at launch. Off: open the workspace and connect manually through Servers. Host identity is always checked.", &["Off", "On"]),
+        ("Reconnect to last server", "Off by default: show your saved servers at startup, or Add server if none exist. On: reconnect to the last successfully opened server. Host identity is always checked.", &["Off", "On"]),
     ];
     ModelRc::new(VecModel::from(
         specs
@@ -128,7 +132,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
     let loaded = Preferences::load(&root);
     let editable = loaded.is_ok();
     let initial = loaded.as_ref().cloned().unwrap_or_else(|_| Preferences {
-        auto_connect: 0,
+        auto_connect_last_server: 0,
         ..Preferences::default()
     });
     crate::i18n::set_language(initial.language);
@@ -205,6 +209,18 @@ mod tests {
         let changed = Preferences::from_choices([1, 1, 2, 1, 3, 2, 0]).unwrap();
         changed.save(dir.path()).unwrap();
         assert_eq!(Preferences::load(dir.path()).unwrap(), changed);
+    }
+    #[test]
+    fn reconnect_requires_explicit_opt_in_after_upgrade() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert_eq!(Preferences::default().choices()[6], 0);
+        fs::write(&path, r#"{"language":1,"auto_connect":1}"#).unwrap();
+        let migrated = Preferences::load(dir.path()).unwrap();
+        assert_eq!(migrated.language(), 1);
+        assert_eq!(migrated.choices()[6], 0);
+        fs::write(&path, r#"{"auto_connect_last_server":1}"#).unwrap();
+        assert_eq!(Preferences::load(dir.path()).unwrap().choices()[6], 1);
     }
     #[test]
     fn invalid_files_are_preserved() {

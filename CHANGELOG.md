@@ -2,6 +2,13 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.18 — 2026-10-25
+
+- Show only plans with an enabled, supported Include or Logical dump selection; remove plans immediately when their last backup is disabled. Preserve canonical Review targets and database protections.
+- Disable automatic reconnection by default. At startup show Servers when profiles exist, or Add server when no profiles exist.
+- Add an explicit Reconnect to last server preference. When enabled, reconnect to the last successfully opened profile, independently of the default profile. Old v0.17 automatic-default preferences do not opt users into this new behavior.
+- Add regression tests for live plan removal, supported methods, settings migration and last-opened server selection.
+
 ## 0.17 — 2026-10-25
 
 - Add File → Settings and sidebar navigation with descriptive preference cards, immediate atomic saves, individual success/failure feedback and protection for malformed settings files.

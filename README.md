@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.17** · Next releases increment by **0.01** (0.18, 0.19, …).
+**Version 0.18** · Next releases increment by **0.01** (0.19, 0.20, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -214,7 +214,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
 
 </div>
 
-## Desktop preferences and language (0.17)
+## Desktop preferences and language (0.18)
 
 Open **File → Settings** (Romanian: **Fișier → Setări**), also available in the sidebar. Each preference has a description and saves immediately, with a confirmation below the changed setting. English is the default; Romanian applies immediately to navigation, dialogs, help and backup choices. Remote SSH/Docker output and technical diagnostic details retain their original text.
 
@@ -222,8 +222,10 @@ Open **File → Settings** (Romanian: **Fișier → Setări**), also available i
 - Startup page: Containers / Backup plans. Applied on the next launch.
 - Initial source filter: All sources / Storage / Databases. Applied on the next launch; the workspace filter remains freely adjustable.
 - New server defaults: SSH port (22, 2022, 2222), timeout (10, 30, 60, 120 seconds), Docker access (Automatic, Direct, passwordless sudo). Existing profiles are unchanged; all supported values can still be entered in the server form.
-- Connect on startup: On / Off. On preserves the existing default-server startup flow; Off starts disconnected for manual connection through Servers. Host-key verification is always mandatory.
+- Reconnect to last server: Off by default. Off opens Servers on launch, or Add server when no profiles exist. On reconnects to the last successfully opened profile. Existing v0.17 auto-connect values do not enable this new preference; turn it on explicitly. Host-key verification is always mandatory.
 
 Preferences live in `settings.json` beside `servers.json`, contain no secrets, and are separate from per-server backup selections. A failed save keeps the previous value active and shows an error. Invalid or unsupported configuration is preserved and editing is blocked rather than silently overwriting it.
 
 To add or maintain Romanian translations, edit `native/translations/ro.json`, then run `python scripts/update-translations.py` (or `--check` to verify the bundled gettext catalog). Translations are built into the application; no gettext runtime or download is required.
+
+Backup plans lists only stacks/containers with at least one enabled, supported Include or Logical dump selection. Disabling the last active selection removes the plan immediately, before saving; Exclude and No backup do not activate a plan.

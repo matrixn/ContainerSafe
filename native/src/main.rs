@@ -666,15 +666,6 @@ fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<Plan
         .applications
         .iter()
         .enumerate()
-        .filter(|(_, app)| {
-            app.sources
-                .iter()
-                .any(|source| has_backup_method(false, &source.policy))
-                || app
-                    .databases
-                    .iter()
-                    .any(|db| has_backup_method(true, &db.engine))
-        })
         .map(|(index, app)| {
             let selected = selection
                 .applications
@@ -717,10 +708,31 @@ fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<Plan
                 })
                 .into(),
                 containers: app.containers.len() as i32,
-                selected: decisions
+                selected: app
+                    .sources
                     .iter()
-                    .filter(|value| matches!(**value, "include" | "logical_dump"))
-                    .count() as i32,
+                    .filter(|source| {
+                        decision_values(false, &source.policy).contains(&"include")
+                            && selected.is_some_and(|selected| {
+                                selected.sources.iter().any(|item| {
+                                    item.path == source.path && item.decision == "include"
+                                })
+                            })
+                    })
+                    .count() as i32
+                    + app
+                        .databases
+                        .iter()
+                        .filter(|db| {
+                            decision_values(true, &db.engine).contains(&"logical_dump")
+                                && selected.is_some_and(|selected| {
+                                    selected.databases.iter().any(|item| {
+                                        item.container == db.container
+                                            && item.decision == "logical_dump"
+                                    })
+                                })
+                        })
+                        .count() as i32,
                 excluded: decisions
                     .iter()
                     .filter(|value| **value == "exclude")
@@ -732,6 +744,7 @@ fn plan_overview(report: &BackupReport, selection: &BackupSelection) -> Vec<Plan
                 app_index: index as i32,
             }
         })
+        .filter(|plan| plan.selected > 0)
         .collect()
 }
 
@@ -1213,7 +1226,7 @@ mod tests {
     }
 
     #[test]
-    fn plans_require_a_backup_method_and_keep_original_review_indices() {
+    fn plans_require_enabled_backup_and_disappear_when_disabled() {
         let mut report: BackupReport =
             serde_json::from_str(include_str!("../tests/fixtures/ui-report.json")).unwrap();
         report.applications[0].sources.clear();
@@ -1247,15 +1260,27 @@ mod tests {
         });
         let mut selection = draft(&report);
         selection.applications[10].sources[0].decision = "exclude".into();
+        assert!(plan_overview(&report, &selection).is_empty());
+        selection.applications[1].sources[0].decision = "include".into();
+        selection.applications[5].databases[0].decision = "logical_dump".into();
+        selection.applications[3]
+            .sources
+            .last_mut()
+            .unwrap()
+            .decision = "include".into();
+        selection.applications[4]
+            .databases
+            .last_mut()
+            .unwrap()
+            .decision = "logical_dump".into();
         let plans = plan_overview(&report, &selection);
         assert_eq!(
             plans.iter().map(|plan| plan.app_index).collect::<Vec<_>>(),
-            [1, 5, 10]
+            [1, 5]
         );
-        assert_eq!(
-            plans[2].excluded, 1,
-            "Eligibility depends on available methods, not the selected decision"
-        );
+        selection.applications[1].sources[0].decision = "pending".into();
+        selection.applications[5].databases[0].decision = "exclude".into();
+        assert!(plan_overview(&report, &selection).is_empty());
         let unavailable = BackupReport {
             schema_version: 1,
             read_only: true,

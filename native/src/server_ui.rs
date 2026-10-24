@@ -602,22 +602,57 @@ pub(super) fn install(ui: &ContainerSafeWindow, state: SharedState, root: PathBu
     slint::Timer::single_shot(Duration::from_millis(1), move || {
         if let Some(ui) = weak.upgrade() {
             let c = control.lock().unwrap();
-            if !c.editable || settings::choice(&ui, 6) == 0 {
+            if !c.editable {
                 return;
             }
-            let default = c
-                .profiles
-                .servers
-                .iter()
-                .find(|s| Some(s.id) == c.profiles.default)
-                .cloned();
+            let reconnect = if settings::choice(&ui, 6) == 1 {
+                last_opened_server(&c.profiles)
+            } else {
+                None
+            };
             let empty = c.profiles.servers.is_empty();
             drop(c);
-            if let Some(server) = default {
+            if let Some(server) = reconnect {
                 open(&ui, &control, &state, &root, server);
             } else {
                 ui.invoke_server_action(if empty { "new" } else { "servers" }.into());
             }
         }
     });
+}
+
+// Only a successfully opened profile is eligible for automatic reconnection.
+fn last_opened_server(profiles: &Profiles) -> Option<Server> {
+    profiles
+        .servers
+        .iter()
+        .filter(|server| server.last_opened.is_some())
+        .max_by_key(|server| server.last_opened)
+        .cloned()
+}
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    #[test]
+    fn reconnect_uses_last_opened_instead_of_default_or_failed_attempt() {
+        let older = Server {
+            last_opened: Some(10),
+            ..Server::default()
+        };
+        let recent = Server {
+            last_opened: Some(30),
+            ..Server::default()
+        };
+        let never_opened = Server::default();
+        let mut profiles = Profiles {
+            default: Some(older.id),
+            servers: vec![older, recent.clone(), never_opened],
+            ..Profiles::default()
+        };
+        assert_eq!(last_opened_server(&profiles).unwrap().id, recent.id);
+        profiles.servers.clear();
+        assert!(last_opened_server(&profiles).is_none());
+        profiles.servers.push(Server::default());
+        assert!(last_opened_server(&profiles).is_none());
+    }
 }
