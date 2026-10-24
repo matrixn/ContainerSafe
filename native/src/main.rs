@@ -777,7 +777,63 @@ fn create_main_window(
 ) -> Result<ContainerSafeWindow, Box<dyn std::error::Error>> {
     let state: SharedState = Arc::new(Mutex::new(initial));
     let ui = ContainerSafeWindow::new()?;
+    center_window_on_first_frame(ui.window());
     settings::install(&ui, root.clone(), state.clone());
+    {
+        let preview: Rc<RefCell<Option<SplashWindow>>> = Rc::new(RefCell::new(None));
+        let main_weak = ui.as_weak();
+        ui.on_preview_splash(move || {
+            if preview.borrow().is_none() {
+                let splash = match SplashWindow::new() {
+                    Ok(splash) => splash,
+                    Err(error) => {
+                        if let Some(ui) = main_weak.upgrade() {
+                            set_status_message(&ui, error.to_string().into(), true);
+                        }
+                        return;
+                    }
+                };
+                splash.set_preview(true);
+                splash.set_loading_progress(100);
+                let weak = splash.as_weak();
+                let main = main_weak.clone();
+                splash.on_dismiss(move || {
+                    if let Some(splash) = weak.upgrade() {
+                        let _ = splash.hide();
+                    }
+                    if let Some(ui) = main.upgrade() {
+                        use slint::winit_030::WinitWindowAccessor;
+                        ui.window()
+                            .with_winit_window(|window| window.focus_window());
+                    }
+                });
+                *preview.borrow_mut() = Some(splash);
+            }
+            if let Some(splash) = preview.borrow().as_ref() {
+                splash.set_loading_message(i18n::text("Splash screen preview").into());
+                center_window_on_first_frame(splash.window());
+                if let Err(error) = splash.show() {
+                    if let Some(ui) = main_weak.upgrade() {
+                        set_status_message(&ui, error.to_string().into(), true);
+                    }
+                } else {
+                    // Native menu dismissal may restore focus to the main window.
+                    // Focus the preview after the menu event has finished.
+                    let weak = splash.as_weak();
+                    Timer::single_shot(Duration::ZERO, move || {
+                        if let Some(splash) = weak.upgrade() {
+                            splash.invoke_focus_preview();
+                            use slint::winit_030::WinitWindowAccessor;
+                            splash
+                                .window()
+                                .with_winit_window(|window| window.focus_window());
+                        }
+                    });
+                }
+            }
+        });
+    }
+
     {
         let guard = state.lock().expect("state mutex poisoned");
         render(&ui, &guard);
@@ -1040,6 +1096,41 @@ fn create_main_window(
     Ok(ui)
 }
 
+fn center_window_on_first_frame(window: &slint::Window) {
+    // The native window does not exist before the event loop starts. Center at
+    // its first redraw, before Slint paints, rather than silently missing it.
+    {
+        use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
+        let mut centered = false;
+        window.on_winit_window_event(move |slint_window, event| {
+            if !centered && matches!(event, winit::event::WindowEvent::RedrawRequested) {
+                centered = slint_window
+                    .with_winit_window(|window| {
+                        let Some(monitor) = window
+                            .current_monitor()
+                            .or_else(|| window.primary_monitor())
+                        else {
+                            return false;
+                        };
+                        let origin = monitor.position();
+                        let screen = monitor.size();
+                        let size = window.outer_size();
+                        if size.width == 0 || size.height == 0 {
+                            return false;
+                        }
+                        window.set_outer_position(winit::dpi::PhysicalPosition::new(
+                            origin.x + (screen.width as i32 - size.width as i32) / 2,
+                            origin.y + (screen.height as i32 - size.height as i32) / 2,
+                        ));
+                        true
+                    })
+                    .unwrap_or(false);
+            }
+            EventResult::Propagate
+        });
+    }
+}
+
 // Progress is based on completed operations, not on an artificial counter.
 enum StartupEvent {
     Progress(i32, String),
@@ -1103,40 +1194,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     slint::select_bundled_translation(if language == 1 { "ro" } else { "" })?;
     splash.set_loading_progress(5);
     splash.set_loading_message(crate::i18n::text("Starting ContainerSafe...").into());
-    // The native window does not exist before the event loop starts. Center at
-    // its first redraw, before Slint paints, rather than silently missing it.
-    {
-        use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
-        let mut centered = false;
-        splash
-            .window()
-            .on_winit_window_event(move |slint_window, event| {
-                if !centered && matches!(event, winit::event::WindowEvent::RedrawRequested) {
-                    centered = slint_window
-                        .with_winit_window(|window| {
-                            let Some(monitor) = window
-                                .current_monitor()
-                                .or_else(|| window.primary_monitor())
-                            else {
-                                return false;
-                            };
-                            let origin = monitor.position();
-                            let screen = monitor.size();
-                            let size = window.outer_size();
-                            if size.width == 0 || size.height == 0 {
-                                return false;
-                            }
-                            window.set_outer_position(winit::dpi::PhysicalPosition::new(
-                                origin.x + (screen.width as i32 - size.width as i32) / 2,
-                                origin.y + (screen.height as i32 - size.height as i32) / 2,
-                            ));
-                            true
-                        })
-                        .unwrap_or(false);
-                }
-                EventResult::Propagate
-            });
-    }
+    center_window_on_first_frame(splash.window());
     splash.show()?;
 
     // All disk I/O is performed off the UI thread.

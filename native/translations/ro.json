@@ -313,5 +313,10 @@
   "Startup & workspace": "Pornire și spațiu de lucru",
   "Choose what opens and which sources are shown when you start.": "Alege pagina de pornire și sursele afișate inițial.",
   "New server defaults": "Valori implicite pentru servere noi",
-  "Starting values for new profiles. Existing servers keep their configuration.": "Valori inițiale pentru profilurile noi. Serverele existente își păstrează configurația."
+  "Starting values for new profiles. Existing servers keep their configuration.": "Valori inițiale pentru profilurile noi. Serverele existente își păstrează configurația.",
+  "Your Docker workspace, ready.": "Spațiul tău Docker, pregătit.",
+  "Discover containers. Review data. Plan your backups.": "Descoperă containerele. Verifică datele. Pregătește backupurile.",
+  "Preview splash screen": "Previzualizare splashscreen",
+  "Preview · Press Esc to close": "Previzualizare · Apasă Esc pentru închidere",
+  "Splash screen preview": "Previzualizare splashscreen"
 }

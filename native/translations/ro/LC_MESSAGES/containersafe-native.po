@@ -949,3 +949,18 @@ msgstr "Valori implicite pentru servere noi"
 msgid "Starting values for new profiles. Existing servers keep their configuration."
 msgstr "Valori inițiale pentru profilurile noi. Serverele existente își păstrează configurația."
 
+msgid "Your Docker workspace, ready."
+msgstr "Spațiul tău Docker, pregătit."
+
+msgid "Discover containers. Review data. Plan your backups."
+msgstr "Descoperă containerele. Verifică datele. Pregătește backupurile."
+
+msgid "Preview splash screen"
+msgstr "Previzualizare splashscreen"
+
+msgid "Preview · Press Esc to close"
+msgstr "Previzualizare · Apasă Esc pentru închidere"
+
+msgid "Splash screen preview"
+msgstr "Previzualizare splashscreen"
+

@@ -2,6 +2,22 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.27 — 2026-10-25
+
+- Center the main desktop window on its monitor at its first native redraw, using actual outer dimensions and display scaling. Share the existing first-frame centering helper with the startup splash and Help preview.
+
+## 0.26 — 2026-10-25
+
+- Add Help → Preview splash screen. The centered preview remains open until Esc and returns focus to the main application. Reuse the startup splash without running startup work or connecting to servers.
+
+## 0.25 — 2026-10-25
+
+- Replace the splash's scaled baked-in text with native DPI-aware branding, description, labels and progress text. Preserve its compact 550 × 353 size, borderless appearance, centering and loading delay.
+
+## 0.24 — 2026-10-25
+
+- Replace the host copy text button with a compact clipboard icon, hover/focus feedback, tooltip and green check confirmation. Preserve copying the complete host and port and keyboard accessibility.
+
 ## 0.23 — 2026-10-25
 
 - Fix splash centering by waiting for the first native redraw event. Previously the positioning call ran before the event loop created the native window and did nothing.

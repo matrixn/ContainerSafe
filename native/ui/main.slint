@@ -121,6 +121,7 @@ export component ContainerSafeWindow inherits Window {
     callback save-server();
     callback browse-key();
     callback trust-host();
+    callback preview-splash();
 
 
     in-out property <[PreferenceEntry]> preferences;
@@ -137,6 +138,7 @@ export component ContainerSafeWindow inherits Window {
             MenuItem { title: @tr("Quit"); shortcut: @keys(Control + Q); activated => { root.server-action("quit"); } }
         }
         Menu { title: @tr("Help");
+            MenuItem { title: @tr("Preview splash screen"); enabled: root.dialog == 0 && !root.loading; activated => { root.preview-splash(); } }
             MenuItem { title: @tr("Documentation"); enabled: !root.test-busy; activated => { root.server-action("docs"); } }
             MenuItem { title: @tr("About ContainerSafe"); enabled: !root.test-busy; activated => { root.dialog = 4; } }
         }

@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.23** · Next releases increment by **0.01** (0.24, 0.25, …).
+**Version 0.27** · Next releases increment by **0.01** (0.28, 0.29, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -20,7 +20,7 @@ ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recov
 
 ![ContainerSafe splash screen](native/assets/splash.png)
 
-*English and Romanian interfaces are available from File → Settings. Splash artwork remains a fixed image.*
+*English and Romanian interfaces are available from File → Settings. The compact startup window renders its text natively for readability.*
 
 </div>
 
@@ -237,3 +237,5 @@ Launch `containersafe-native --loading-gallery` to compare ten native loading an
 Choose **File → Settings → Loading animation** to preview and automatically save any of the ten options. Breath (option 2) is the default, including when upgrading an existing settings file. The same animation is used in the actual connection popup.
 
 Desktop settings are grouped into three cards: Appearance & language, Startup & workspace, and New server defaults. Ordinary labels are nonselectable; error output remains selectable. Copy host in the server list copies the complete address including its SSH port. The splash is a centered, undecorated 550 × 353 window.
+
+Use **Help → Preview splash screen** to view the splash at any time. Press **Esc** to close the preview and return to the app; the preview does not run startup operations.

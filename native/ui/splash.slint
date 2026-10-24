@@ -1,85 +1,37 @@
-import { SelectableText } from "selectable-text.slint";
-// ContainerSafe native splash screen — Slint 1.18.x.
-// The background picture is bundled at compile time.
-// Progress and status are genuine UI properties updated from Rust.
+// Native text remains readable at the compact size and scales with display DPI.
 export component SplashWindow inherits Window {
     title: @tr("ContainerSafe — Starting");
-    width: 550px;
-    height: 353px;
-    no-frame: true;
-    background: #071526;
+    width: 550px; height: 353px; no-frame: true;
+    background: @linear-gradient(135deg, #071526 0%, #12364b 100%);
     default-font-family: "Segoe UI";
-
+    in property <bool> preview: false;
+    callback dismiss();
+    forward-focus: keys;
+    public function focus-preview() { keys.focus(); }
+    keys := FocusScope { key-pressed(event) => { if event.text == Key.Escape { root.dismiss(); return accept; } return reject; } }
     in-out property <int> loading-progress: 0;
     in-out property <string> loading-message: @tr("Initializing ContainerSafe...");
 
-    Image {
-        x: 0px;
-        y: 0px;
-        width: parent.width;
-        height: parent.height - 64px;
-        source: @image-url("../assets/splash.png");
-        image-fit: contain;
+    Rectangle { x: 418px; y: -68px; width: 210px; height: 210px; border-radius: 105px; border-width: 1px; border-color: #245168; background: transparent; opacity: 0.45; }
+    Rectangle { x: 454px; y: -32px; width: 138px; height: 138px; border-radius: 69px; border-width: 1px; border-color: #347288; background: transparent; opacity: 0.35; }
+    Image { x: 28px; y: 24px; width: 64px; height: 64px; source: @image-url("../assets/icons/containersafe-256.png"); image-fit: contain; }
+    Text { x: 108px; y: 31px; width: 390px; height: 36px; text: "ContainerSafe"; font-size: 29px; font-weight: 750; color: #f1f8ff; vertical-alignment: center; }
+    Text { x: 110px; y: 69px; width: 390px; height: 18px; text: @tr("Discovery & planning"); font-size: 13px; color: #71cedd; }
+
+    Text { x: 28px; y: 113px; width: parent.width - 56px; height: 30px; text: @tr("Your Docker workspace, ready."); font-size: 23px; font-weight: 600; color: #edf7ff; }
+    Text { x: 28px; y: 153px; width: parent.width - 56px; height: 44px; text: @tr("Discover containers. Review data. Plan your backups."); font-size: 14px; color: #b5cadc; wrap: word-wrap; }
+    HorizontalLayout { x: 28px; y: 207px; width: parent.width - 56px; height: 28px; spacing: 10px;
+        for label in [@tr("Containers"), @tr("Storage"), @tr("Backup plans")]: Rectangle {
+            background: #17374b; border-radius: 6px; border-width: 1px; border-color: #284c61;
+            Text { text: label; color: #a9d7e3; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+        }
     }
-
-    Rectangle {
-        x: 0px;
-        y: parent.height - 64px;
-        width: parent.width;
-        height: 64px;
-        background: #071526;
-
-        SelectableText {
-            x: 14px;
-            y: 2px;
-            width: parent.width - 80px;
-            height: 24px;
-            text: root.loading-message;
-            text-color: #dcecff;
-            font-size: 12px;
-            vertical-alignment: center;
+    Rectangle { x: 28px; y: 257px; width: parent.width - 56px; height: 76px; background: transparent;
+        Text { x: 0px; y: 0px; width: parent.width - 55px; height: 24px; text: root.loading-message; color: #e2effb; font-size: 13px; vertical-alignment: center; overflow: elide; }
+        Text { x: parent.width - 50px; y: 0px; width: 50px; height: 24px; text: root.loading-progress + "%"; color: #66d5ed; font-size: 13px; font-weight: 700; horizontal-alignment: right; vertical-alignment: center; }
+        Rectangle { x: 0px; y: 31px; width: parent.width; height: 5px; border-radius: 2.5px; background: #294457;
+            Rectangle { x: 0px; y: 0px; width: parent.width * root.loading-progress / 100; height: parent.height; border-radius: 2.5px; background: @linear-gradient(90deg, #2795b2 0%, #66d5ed 100%); }
         }
-
-        SelectableText {
-            x: parent.width - 60px;
-            y: 2px;
-            width: 46px;
-            height: 24px;
-            text: root.loading-progress + "%";
-            text-color: #5cd5ff;
-            font-weight: 700;
-            font-size: 12px;
-            horizontal-alignment: right;
-            vertical-alignment: center;
-        }
-
-        Rectangle {
-            x: 14px;
-            y: 30px;
-            width: parent.width - 28px;
-            height: 4px;
-            border-radius: 4px;
-            background: #24364f;
-
-            Rectangle {
-                x: 0px;
-                y: 0px;
-                width: parent.width * root.loading-progress / 100;
-                height: parent.height;
-                border-radius: 4px;
-                background: #26c1f3;
-            }
-        }
-
-        SelectableText {
-            x: 14px;
-            y: 42px;
-            width: parent.width - 28px;
-            height: 18px;
-            text: @tr("Local startup checks only · No Docker changes performed");
-            text-color: #809ab7;
-            font-size: 9px;
-            vertical-alignment: center;
-        }
+        Text { x: 0px; y: 47px; width: parent.width; height: 28px; text: root.preview ? @tr("Preview · Press Esc to close") : @tr("Local startup checks only · No Docker changes performed"); color: #9fb8cc; font-size: 11px; wrap: word-wrap; }
     }
 }
