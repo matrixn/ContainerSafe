@@ -1,4 +1,10 @@
-# ContainerSafe 0.30 — backupuri manuale de fișiere
+# ContainerSafe 0.34 — backupuri manuale de fișiere
+
+Din 0.34 poți salva direct pe PC prin **This PC via SSH tunnel**, fără server SSH
+pe PC, sau poți descărca un export criptat prin **SFTP pull** ori **SSH binary streaming**.
+Vezi [pașii de configurare din README](../README.md#backups-and-transfers-to-this-pc-031034)
+și [arhitectura și limitele transferurilor](PC_TRANSFERS.md). Opțiunea existentă
+**This computer (SFTP)** își păstrează sensul: NAS-ul trimite date către serverul SFTP de pe PC.
 
 ## Mod implicit: Restic direct prin SSH, fără agent
 

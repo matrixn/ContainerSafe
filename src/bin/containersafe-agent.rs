@@ -15,13 +15,13 @@ fn main() {
             "{}",
             serde_json::json!({"protocol_version": PROTOCOL_VERSION,
             "application_version": containersafe::VERSION, "platform_supported": cfg!(target_os = "linux"),
-            "transport": "stdio-one-request", "operations": ["describe", "init", "backup", "backup_selected", "snapshots", "check", "restore"]})
+            "transport": "stdio-one-request", "operations": ["describe", "init", "backup", "backup_selected", "pc_repository", "snapshots", "check", "restore"]})
         );
         return;
     }
     let response = match args.as_slice() {
         [option, config] if option == "--config" => {
-            let mut input = Vec::new();
+            let mut input = zeroize::Zeroizing::new(Vec::new());
             if io::stdin()
                 .take(MAX_REQUEST_BYTES + 1)
                 .read_to_end(&mut input)

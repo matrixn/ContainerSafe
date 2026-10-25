@@ -9,13 +9,15 @@ pub mod preflight;
 pub mod restic;
 pub mod restic_lab;
 pub mod selection;
+#[cfg(feature = "server-management")]
+pub mod transfer;
 
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[cfg(feature = "server-management")]
 pub mod servers;
-pub const VERSION: &str = "0.30";
+pub const VERSION: &str = "0.34";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {

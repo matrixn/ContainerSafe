@@ -99,6 +99,13 @@ export component ContainerSafeWindow inherits Window {
     in-out property <string> backup-config;
     in-out property <string> backup-job;
     in-out property <string> backup-restic;
+    in-out property <string> backup-rest-server;
+    in-out property <string> backup-transfer-directory;
+    in-out property <bool> backup-stream;
+    in-out property <string> backup-local-restic;
+    in-out property <string> backup-local-password-file;
+    in-out property <string> backup-mirror-directory;
+    in-out property <bool> backup-cancellable;
     in-out property <string> backup-password-file;
     in-out property <string> backup-restore-root;
     in-out property <bool> backup-acknowledged;
@@ -368,6 +375,9 @@ export component ContainerSafeWindow inherits Window {
             kind <=> root.backup-kind; location <=> root.backup-location;
             executable <=> root.backup-executable; config <=> root.backup-config;
             job <=> root.backup-job; restic <=> root.backup-restic;
+            rest-server <=> root.backup-rest-server;
+            transfer-directory <=> root.backup-transfer-directory; stream <=> root.backup-stream;
+            local-restic <=> root.backup-local-restic; local-password-file <=> root.backup-local-password-file; mirror-directory <=> root.backup-mirror-directory;
             password-file <=> root.backup-password-file; restore-root <=> root.backup-restore-root;
             acknowledged <=> root.backup-acknowledged; snapshots <=> root.backup-snapshots; snapshot-index <=> root.backup-snapshot-index;
             result: root.backup-result; error: root.backup-error;
@@ -430,11 +440,12 @@ export component ContainerSafeWindow inherits Window {
         key-pressed(event) => { return accept; }
         Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-            width: 380px; height: 196px; background: white;
+            width: 420px; height: root.backup-cancellable ? 260px : 196px; background: white;
             border-radius: 14px; border-width: 1px; border-color: Theme.line;
             VerticalLayout { padding: 28px; spacing: 20px; alignment: center;
                 HorizontalLayout { alignment: center; LoadingMotion { kind: root.loading-animation; } }
                 SelectableText { text: root.connection-step; text-color: Theme.ink; font-size: 15px; font-weight: 600; horizontal-alignment: center; wrap: word-wrap; }
+                if root.backup-cancellable : Button { text: @tr("Cancel transfer"); clicked => { root.backup-action("cancel-transfer"); } }
             }
         }
         }

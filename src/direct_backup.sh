@@ -24,7 +24,7 @@ case "$mode" in 600|400) ;; *) exit 71;; esac
 [ "$owner" = "$(id -u)" ] || [ "$owner" = 0 ] || exit 71
 password=$(readlink -f "$password") || exit 71
 local_repo=1
-case "$repo" in sftp:*|s3:https://*) local_repo=0;; esac
+case "$repo" in sftp:*|s3:https://*|rest:http://127.0.0.1:*) local_repo=0;; esac
 if [ "$local_repo" = 1 ]; then
     if [ "$op" = init ]; then
         parent=$(readlink -f "$(dirname "$repo")") || exit 75

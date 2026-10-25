@@ -14,6 +14,7 @@ pub enum DestinationKind {
     ServerFolder,
     ThisComputer,
     Remote,
+    LocalPcRepository,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +35,7 @@ impl Destination {
                 (value.starts_with("sftp:") && value.contains(":/"))
                     || value.starts_with("s3:https://")
             }
+            DestinationKind::LocalPcRepository => std::path::Path::new(value).is_absolute(),
         };
         if !valid {
             return Err("Use an absolute server folder, sftp:user@host:/path, or s3:https://endpoint/bucket/path".into());
@@ -76,6 +78,8 @@ pub struct JobDescription {
     pub sources: Vec<PathBuf>,
     pub restore_root: PathBuf,
     pub timeout_seconds: u64,
+    #[serde(default)]
+    pub pc_repository: Option<Uuid>,
 }
 
 pub fn call(
@@ -84,14 +88,31 @@ pub fn call(
     action: Action,
     timeout: u64,
 ) -> Result<serde_json::Value, String> {
+    call_cancellable(connection, endpoint, action, timeout, None)
+}
+pub fn call_cancellable(
+    connection: &Connection,
+    endpoint: &AgentEndpoint,
+    action: Action,
+    timeout: u64,
+    cancellation: Option<&crate::transfer::CancellationToken>,
+) -> Result<serde_json::Value, String> {
     let request = Request {
         protocol_version: PROTOCOL_VERSION,
         request_id: Uuid::new_v4(),
         job_id: endpoint.job_id,
         action,
     };
-    let data = serde_json::to_vec(&request).map_err(|_| "Cannot encode agent request")?;
-    let output = connection.agent(&endpoint.executable, &endpoint.config, &data, timeout)?;
+    let data = zeroize::Zeroizing::new(
+        serde_json::to_vec(&request).map_err(|_| "Cannot encode agent request")?,
+    );
+    let output = connection.agent_cancellable(
+        &endpoint.executable,
+        &endpoint.config,
+        &data,
+        timeout,
+        cancellation,
+    )?;
     parse_response(&output, request.request_id)
 }
 fn parse_response(output: &[u8], expected: Uuid) -> Result<serde_json::Value, String> {

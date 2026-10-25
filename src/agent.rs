@@ -37,6 +37,13 @@ pub struct JobConfig {
     pub restore_root: PathBuf,
     #[serde(default)]
     pub allowed_operations: Vec<Operation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pc_repository: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pc_only: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -61,6 +68,12 @@ pub struct Request {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Action {
+    PcRepository {
+        repository_id: Uuid,
+        port: u16,
+        auth: crate::restic::RestCredentials,
+        action: PcOperation,
+    },
     Describe {},
     BackupSelected {
         expected_sources: Vec<PathBuf>,
@@ -78,9 +91,55 @@ pub enum Action {
         directory: String,
     },
 }
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PcOperation {
+    Init {},
+    Backup {
+        expected_sources: Vec<PathBuf>,
+    },
+    Snapshots {},
+    Check {
+        read_data: bool,
+    },
+    Restore {
+        snapshot_id: String,
+        directory: String,
+    },
+}
+impl PcOperation {
+    fn operation(&self) -> Operation {
+        match self {
+            Self::Init {} => Operation::Init,
+            Self::Backup { .. } => Operation::Backup,
+            Self::Snapshots {} => Operation::Snapshots,
+            Self::Check { .. } => Operation::Check,
+            Self::Restore { .. } => Operation::Restore,
+        }
+    }
+    pub fn from_action(action: Action) -> Result<Self, String> {
+        Ok(match action {
+            Action::Init {} => Self::Init {},
+            Action::BackupSelected {
+                expected_sources, ..
+            } => Self::Backup { expected_sources },
+            Action::Snapshots {} => Self::Snapshots {},
+            Action::Check { read_data } => Self::Check { read_data },
+            Action::Restore {
+                snapshot_id,
+                directory,
+            } => Self::Restore {
+                snapshot_id,
+                directory,
+            },
+            _ => return Err("Unsupported tunneled agent operation".into()),
+        })
+    }
+}
 impl Action {
     fn operation(&self) -> Operation {
         match self {
+            Self::PcRepository { action, .. } => action.operation(),
             Self::Describe {} | Self::BackupSelected { .. } => Operation::Backup,
             Self::Init {} => Operation::Init,
             Self::Backup {} => Operation::Backup,
@@ -209,10 +268,12 @@ impl Agent {
             if job.id.is_nil()
                 || !ids.insert(job.id)
                 || job.repository.secret_reference.is_nil()
-                || !crate::restic::valid_repository(&job.repository.path)
+                || (!job.pc_only && !crate::restic::valid_repository(&job.repository.path))
+                || (job.pc_only && job.pc_repository.is_none())
                 || !job.secret_file.is_absolute()
                 || !job.restore_root.is_absolute()
                 || job.sources.iter().any(|p| !p.is_absolute())
+                || job.pc_repository.is_some_and(|id| id.is_nil())
             {
                 return Err(ErrorCode::InvalidConfig.into());
             }
@@ -237,6 +298,98 @@ impl Agent {
             Err(error) => Response::failure(request_id, error),
         }
     }
+    fn execute_pc(
+        &self,
+        job: &JobConfig,
+        repository_id: Uuid,
+        port: u16,
+        auth: &crate::restic::RestCredentials,
+        action: PcOperation,
+    ) -> Result<serde_json::Value, AgentError> {
+        if job.pc_repository != Some(repository_id)
+            || repository_id.is_nil()
+            || port == 0
+            || auth.username != "repository"
+            || !(32..=72).contains(&auth.password.len())
+            || auth.password.contains('\0')
+        {
+            return Err(ErrorCode::OperationDenied.into());
+        }
+        if let PcOperation::Backup { expected_sources } = &action {
+            if expected_sources.is_empty()
+                || expected_sources
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    != job
+                        .sources
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+            {
+                return Err(ErrorCode::PlanChanged.into());
+            }
+            for source in &job.sources {
+                let source = fs::canonicalize(source).map_err(|_| ErrorCode::InvalidConfig)?;
+                for configured in &self.config.jobs {
+                    let secret = fs::canonicalize(&configured.secret_file)
+                        .map_err(|_| ErrorCode::InvalidConfig)?;
+                    if secret.starts_with(&source) {
+                        return Err(ErrorCode::InvalidConfig.into());
+                    }
+                }
+                if self
+                    .config_path
+                    .as_ref()
+                    .is_some_and(|path| path.starts_with(&source))
+                {
+                    return Err(ErrorCode::InvalidConfig.into());
+                }
+            }
+        }
+        let target = match &action {
+            PcOperation::Restore { directory, .. } => Some(restore_target(job, directory)?),
+            _ => None,
+        };
+        let bytes = protected_read(&job.secret_file, true, 16 * 1024)?;
+        let password = std::str::from_utf8(&bytes).map_err(|_| ErrorCode::SecretUnavailable)?;
+        let password = password
+            .strip_suffix("\r\n")
+            .or_else(|| password.strip_suffix('\n'))
+            .unwrap_or(password);
+        if password.contains(['\r', '\n']) {
+            return Err(ErrorCode::SecretUnavailable.into());
+        }
+        let secret = RepositorySecret::new(job.repository.secret_reference, password.to_owned())?;
+        let repository = RepositoryConfig {
+            path: format!("rest:http://127.0.0.1:{port}/repository/").into(),
+            secret_reference: job.repository.secret_reference,
+        };
+        let engine = ResticEngine::new(&self.config.restic_executable)?
+            .with_timeout(Duration::from_secs(self.config.timeout_seconds))?
+            .with_rest_credentials(auth);
+        let result = match action {
+            PcOperation::Init {} => {
+                engine.init(&repository, &secret)?;
+                Ok(serde_json::json!({"initialized":true}))
+            }
+            PcOperation::Backup { .. } => {
+                serde_json::to_value(engine.backup(&repository, &secret, &job.sources)?)
+            }
+            PcOperation::Snapshots {} => {
+                serde_json::to_value(engine.snapshots(&repository, &secret)?)
+            }
+            PcOperation::Check { read_data } => {
+                serde_json::to_value(engine.check(&repository, &secret, read_data)?)
+            }
+            PcOperation::Restore { snapshot_id, .. } => serde_json::to_value(engine.restore(
+                &repository,
+                &secret,
+                &snapshot_id,
+                None,
+                target.as_ref().ok_or(ErrorCode::Internal)?,
+            )?),
+        };
+        result.map_err(|_| ErrorCode::Internal.into())
+    }
     fn execute(&self, request: Request) -> Result<serde_json::Value, AgentError> {
         if request.protocol_version != PROTOCOL_VERSION {
             return Err(ErrorCode::UnsupportedProtocol.into());
@@ -253,10 +406,27 @@ impl Agent {
         if !job.allowed_operations.contains(&request.action.operation()) {
             return Err(ErrorCode::OperationDenied.into());
         }
+        if job.pc_only
+            && !matches!(
+                request.action,
+                Action::Describe {} | Action::PcRepository { .. }
+            )
+        {
+            return Err(ErrorCode::OperationDenied.into());
+        }
+        if let Action::PcRepository {
+            repository_id,
+            port,
+            auth,
+            action,
+        } = request.action
+        {
+            return self.execute_pc(job, repository_id, port, &auth, action);
+        }
         if matches!(request.action, Action::Describe {}) {
             return Ok(serde_json::json!({"repository": job.repository.path,
                 "sources": job.sources, "restore_root": job.restore_root,
-                "timeout_seconds": self.config.timeout_seconds}));
+                "timeout_seconds": self.config.timeout_seconds,"pc_repository":job.pc_repository}));
         }
         if let Action::BackupSelected {
             expected_sources,
@@ -308,6 +478,7 @@ impl Agent {
         }
         let secret = RepositorySecret::new(job.repository.secret_reference, password.to_owned())?;
         let value = match request.action {
+            Action::PcRepository { .. } => unreachable!(),
             Action::Describe {} => unreachable!(),
             Action::Init {} => {
                 self.engine.init(&job.repository, &secret)?;
@@ -452,6 +623,8 @@ mod tests {
                 sources: vec![root.join("source")],
                 restore_root: root.join("restores"),
                 allowed_operations: vec![],
+                pc_repository: None,
+                pc_only: false,
             }],
         }
     }
@@ -563,6 +736,52 @@ mod tests {
         assert_eq!(response.request_id, Some(identity));
         assert_eq!(code(response), ErrorCode::OperationDenied);
         assert!(!directory.path().join("repository").exists());
+    }
+    #[test]
+    fn pc_jobs_require_explicit_repository_and_source_authorization() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        let id = config.jobs[0].id;
+        let repository = Uuid::new_v4();
+        config.jobs[0].allowed_operations = vec![Operation::Init, Operation::Backup];
+        config.jobs[0].pc_repository = Some(repository);
+        config.jobs[0].pc_only = true;
+        let agent = Agent::new(config).unwrap();
+        assert_eq!(
+            code(agent.handle(request(id, Action::Init {}))),
+            ErrorCode::OperationDenied
+        );
+        let auth = || crate::restic::RestCredentials {
+            username: "repository".into(),
+            password: "x".repeat(64),
+        };
+        assert!(!format!("{:?}", auth()).contains(&"x".repeat(64)));
+        assert_eq!(
+            code(agent.handle(request(
+                id,
+                Action::PcRepository {
+                    repository_id: Uuid::new_v4(),
+                    port: 12345,
+                    auth: auth(),
+                    action: PcOperation::Init {}
+                }
+            ))),
+            ErrorCode::OperationDenied
+        );
+        assert_eq!(
+            code(agent.handle(request(
+                id,
+                Action::PcRepository {
+                    repository_id: repository,
+                    port: 12345,
+                    auth: auth(),
+                    action: PcOperation::Backup {
+                        expected_sources: vec![]
+                    }
+                }
+            ))),
+            ErrorCode::PlanChanged
+        );
     }
 
     #[test]

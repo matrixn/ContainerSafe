@@ -44,16 +44,64 @@ pub struct Connection {
     session: client::Handle<PinnedHost>,
     runtime: tokio::runtime::Runtime,
     docker_prefix: &'static str,
+    host_key: String,
+    forwarding: Arc<Mutex<Option<crate::transfer::reverse_tunnel::ForwardTarget>>>,
 }
 
-struct PinnedHost {
+pub(crate) struct PinnedHost {
     endpoint: String,
     fingerprint: Option<String>,
     rejection: Arc<Mutex<Option<Failure>>>,
     progress: Progress,
+    forwarding: Arc<Mutex<Option<crate::transfer::reverse_tunnel::ForwardTarget>>>,
 }
 impl client::Handler for PinnedHost {
     type Error = russh::Error;
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let target = self
+            .forwarding
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .filter(|target| {
+                connected_address == "127.0.0.1" && target.remote_port == connected_port
+            });
+        let Some(target) = target else {
+            return Ok(());
+        };
+        let Ok(slot) = target.slots.clone().try_acquire_owned() else {
+            return Ok(());
+        };
+        let stream = tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::net::TcpStream::connect(("127.0.0.1", target.local_port)),
+        )
+        .await;
+        let Ok(Ok(mut stream)) = stream else {
+            return Ok(());
+        };
+        reply.accept().await;
+        tokio::spawn(async move {
+            let _slot = slot;
+            let mut remote = crate::transfer::reverse_tunnel::Counted {
+                inner: channel.into_stream(),
+                bytes: target.bytes,
+            };
+            tokio::select! {_=target.cancellation.cancelled()=>{}, _=tokio::io::copy_bidirectional(&mut remote,&mut stream)=>{}}
+            use tokio::io::AsyncWriteExt;
+            let _ = tokio::time::timeout(Duration::from_secs(1), remote.shutdown()).await;
+        });
+        Ok(())
+    }
     async fn check_server_key(
         &mut self,
         key: &PublicKeyOrCertificate,
@@ -145,6 +193,89 @@ pub fn verify_host(identity: &HostIdentity, pinned: Option<&str>) -> Result<(), 
 }
 
 impl Connection {
+    pub(crate) fn start_reverse_forward(
+        &self,
+        local_port: u16,
+        cancellation: crate::transfer::CancellationToken,
+        bytes: Arc<std::sync::atomic::AtomicU64>,
+    ) -> Result<u32, crate::transfer::TransferError> {
+        if local_port == 0
+            || self
+                .forwarding
+                .lock()
+                .map_err(|_| crate::transfer::TransferError::Io)?
+                .is_some()
+        {
+            return Err(crate::transfer::TransferError::Collision);
+        }
+        let port = self.runtime.block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(15),
+                self.session.tcpip_forward("127.0.0.1", 0),
+            )
+            .await
+            .map_err(|_| crate::transfer::TransferError::Timeout)?
+            .map_err(|_| crate::transfer::TransferError::ForwardingDenied)
+        })?;
+        if port == 0 || port > 65535 {
+            return Err(crate::transfer::TransferError::ForwardingDenied);
+        }
+        *self
+            .forwarding
+            .lock()
+            .map_err(|_| crate::transfer::TransferError::Io)? =
+            Some(crate::transfer::reverse_tunnel::ForwardTarget {
+                local_port,
+                remote_port: port,
+                cancellation,
+                bytes,
+                slots: Arc::new(tokio::sync::Semaphore::new(32)),
+            });
+        Ok(port)
+    }
+    pub(crate) fn stop_reverse_forward(&self, port: u32) {
+        if let Ok(mut target) = self.forwarding.lock() {
+            if let Some(target) = target.take() {
+                target.cancellation.cancel();
+            }
+        }
+        let _ = self.runtime.block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(2),
+                self.session.cancel_tcpip_forward("127.0.0.1", port),
+            )
+            .await
+        });
+    }
+    pub fn data_identity(&self) -> Result<super::storage::DataIdentity, String> {
+        Ok(super::storage::DataIdentity {
+            server_id: self.server.id,
+            host: self.server.host.to_ascii_lowercase(),
+            port: self.server.port,
+            host_key: self.host_key.clone(),
+        })
+    }
+    pub(crate) fn transfer_runtime(&self) -> &tokio::runtime::Runtime {
+        &self.runtime
+    }
+    pub(crate) fn transfer_session(&self) -> &client::Handle<PinnedHost> {
+        &self.session
+    }
+    pub(crate) fn verify_transfer_source(
+        &self,
+        source: &crate::transfer::SourceIdentity,
+    ) -> Result<(), crate::transfer::TransferError> {
+        let identity = self
+            .data_identity()
+            .map_err(|_| crate::transfer::TransferError::InvalidReceipt)?;
+        if source.server_id != identity.server_id
+            || source.endpoint != format!("[{}]:{}", identity.host, identity.port)
+            || source.host_key != identity.host_key
+        {
+            return Err(crate::transfer::TransferError::SourceChanged);
+        }
+        source.validate()
+    }
     /// Invoke only the configured stdio agent. Credentials stay in SSH; the
     /// request carries job IDs/approved source paths, never repository passwords.
     pub fn agent(
@@ -153,6 +284,16 @@ impl Connection {
         config: &str,
         input: &[u8],
         timeout_seconds: u64,
+    ) -> Result<Vec<u8>, String> {
+        self.agent_cancellable(executable, config, input, timeout_seconds, None)
+    }
+    pub(crate) fn agent_cancellable(
+        &self,
+        executable: &str,
+        config: &str,
+        input: &[u8],
+        timeout_seconds: u64,
+        cancellation: Option<&crate::transfer::CancellationToken>,
     ) -> Result<Vec<u8>, String> {
         fn quote(value: &str) -> Result<String, String> {
             if !value.starts_with('/') || value.contains(['\0', '\r', '\n']) || value.len() > 4096 {
@@ -166,7 +307,7 @@ impl Connection {
             return Err("Invalid agent request size or timeout".into());
         }
         let command = format!("{} --config {}", quote(executable)?, quote(config)?);
-        self.input_command(command, input, timeout_seconds, true)
+        self.input_command(command, input, timeout_seconds, true, cancellation)
     }
 
     pub(crate) fn restic_script(
@@ -174,6 +315,15 @@ impl Connection {
         script: &str,
         arguments: &[String],
         timeout_seconds: u64,
+    ) -> Result<Vec<u8>, String> {
+        self.restic_script_cancellable(script, arguments, timeout_seconds, None)
+    }
+    pub(crate) fn restic_script_cancellable(
+        &self,
+        script: &str,
+        arguments: &[String],
+        timeout_seconds: u64,
+        cancellation: Option<&crate::transfer::CancellationToken>,
     ) -> Result<Vec<u8>, String> {
         if script.len() > 64 * 1024
             || !(1..=86400).contains(&timeout_seconds)
@@ -187,7 +337,13 @@ impl Connection {
         for argument in arguments {
             command.push_str(&format!(" '{}'", argument.replace('\'', "'\\''")));
         }
-        self.input_command(command, script.as_bytes(), timeout_seconds, false)
+        self.input_command(
+            command,
+            script.as_bytes(),
+            timeout_seconds,
+            false,
+            cancellation,
+        )
     }
 
     fn input_command(
@@ -196,6 +352,7 @@ impl Connection {
         input: &[u8],
         timeout_seconds: u64,
         agent: bool,
+        cancellation: Option<&crate::transfer::CancellationToken>,
     ) -> Result<Vec<u8>, String> {
         self.runtime.block_on(async {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_seconds);
@@ -246,9 +403,20 @@ impl Connection {
                     None => Err("SSH: remote command ended without an exit status".into()),
                 }
             };
-            let result = tokio::time::timeout_at(deadline, operation).await;
+            let result = if let Some(cancellation)=cancellation {
+                tokio::select! {
+                    _=cancellation.cancelled()=>Ok(Err("Transfer: Cancelled".to_string())),
+                    result=tokio::time::timeout_at(deadline,operation)=>result,
+                }
+            } else {tokio::time::timeout_at(deadline, operation).await};
             if !matches!(&result, Ok(Ok(_))) {
+                let _ = tokio::time::timeout(Duration::from_secs(1), channel.signal(russh::Sig::TERM)).await;
                 let _ = tokio::time::timeout(Duration::from_secs(1), channel.close()).await;
+                if cancellation.is_some_and(|token| token.check().is_err()) {
+                    // A remote Restic process receiving TERM/HUP needs the live
+                    // REST bridge to remove its own lock. Never unlock for it.
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                }
             }
             result.map_err(|_| "SSH operation timed out. The remote process may still be running; inspect snapshots before retrying".to_string())?
         })
@@ -278,13 +446,18 @@ impl Connection {
             .map_err(|_| "SSH: runtime initialization failed".to_string())?;
         let endpoint = format!("[{}]:{}", server.host.to_ascii_lowercase(), server.port);
         let rejection = Arc::new(Mutex::new(None));
+        let forwarding = Arc::new(Mutex::new(None));
         let handler = PinnedHost {
             fingerprint: hosts.get(&endpoint).cloned(),
             endpoint,
             rejection: rejection.clone(),
             progress: progress.clone(),
+            forwarding: forwarding.clone(),
         };
-        let config = Arc::new(client::Config::default());
+        let config = Arc::new(client::Config {
+            keepalive_interval: Some(Duration::from_secs(15)),
+            ..client::Config::default()
+        });
         let connected = runtime.block_on(async {
             tokio::time::timeout(
                 timeout,
@@ -351,6 +524,15 @@ impl Connection {
             session,
             runtime,
             docker_prefix: "docker",
+            host_key: hosts
+                .get(&format!(
+                    "[{}]:{}",
+                    server.host.to_ascii_lowercase(),
+                    server.port
+                ))
+                .cloned()
+                .ok_or_else(|| "Missing trusted host identity".to_string())?,
+            forwarding,
         };
         progress(ConnectionStage::CheckingDocker);
         let candidates: Vec<_> = match server.docker_access {

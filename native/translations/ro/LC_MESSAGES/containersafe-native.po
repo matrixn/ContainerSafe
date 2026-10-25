@@ -1183,3 +1183,102 @@ msgstr "Server implicit"
 msgid "The starred server is your default and appears first. Opening another server keeps this choice."
 msgstr "Serverul marcat cu stea este implicit și apare primul. Deschiderea altui server păstrează această alegere."
 
+msgid "Cancel transfer"
+msgstr "Anulează transferul"
+
+msgid "This PC via SSH tunnel"
+msgstr "Acest PC prin tunel SSH"
+
+msgid "Choose PC folder"
+msgstr "Alege folderul de pe PC"
+
+msgid "Choose rest-server executable"
+msgstr "Alege executabilul rest-server"
+
+msgid "Absolute folder on this PC"
+msgstr "Folder absolut pe acest PC"
+
+msgid "The repository is stored on this PC through an authenticated loopback SSH tunnel."
+msgstr "Depozitul este salvat pe acest PC printr-un tunel SSH autentificat, accesibil doar local."
+
+msgid "Encrypted repository on this PC through your verified SSH connection. No SSH server is needed on the PC. The official rest-server helper runs only during this operation and listens on loopback. The PC must stay awake."
+msgstr "Depozit criptat pe acest PC prin conexiunea SSH verificată. Nu este necesar un server SSH pe PC. Utilitarul oficial rest-server rulează doar pe durata operației și ascultă doar local. PC-ul trebuie să rămână activ."
+
+msgid "Download an encrypted snapshot to this PC"
+msgstr "Descarcă un snapshot criptat pe acest PC"
+
+msgid "First select a snapshot and create an immutable encrypted export. SFTP supports explicit resume; SSH streaming starts a new transfer on retry. Neither method requires an SSH server on the PC."
+msgstr "Selectează un snapshot și creează un export criptat imuabil. SFTP permite reluarea explicită; streamingul SSH pornește un transfer nou la reîncercare. Niciuna dintre metode nu necesită server SSH pe PC."
+
+msgid "SFTP pull (resume supported)"
+msgstr "Descărcare SFTP (cu reluare)"
+
+msgid "SSH binary streaming"
+msgstr "Streaming binar prin SSH"
+
+msgid "Create encrypted export"
+msgstr "Creează exportul criptat"
+
+msgid "Download"
+msgstr "Descarcă"
+
+msgid "Resume SFTP"
+msgstr "Reia transferul SFTP"
+
+msgid "Cancelling transfer… Inspect snapshots before retrying."
+msgstr "Se anulează transferul… Verifică snapshoturile înainte de reîncercare."
+
+msgid "Encrypted export ready. Choose a PC folder and download."
+msgstr "Exportul criptat este gata. Alege un folder de pe PC și descarcă."
+
+msgid "Local verification and isolated restore"
+msgstr "Verificare locală și restaurare izolată"
+
+msgid "Use a local Restic executable and a protected local file containing the repository password. Secrets are never copied from the NAS. Restore creates a new directory in the chosen PC folder. Repository copy uses restic copy and preserves existing snapshots."
+msgstr "Folosește Restic local și un fișier local protejat cu parola depozitului. Secretele nu sunt copiate de pe NAS. Restaurarea creează un director nou în folderul ales de pe PC. Copierea depozitului utilizează restic copy și păstrează snapshoturile existente."
+
+msgid "Restic on this PC"
+msgstr "Restic pe acest PC"
+
+msgid "Password file on this PC"
+msgstr "Fișierul parolei pe acest PC"
+
+msgid "Isolated restore folder on this PC"
+msgstr "Folder pentru restaurare izolată pe acest PC"
+
+msgid "PC folder for repository copy"
+msgstr "Folder PC pentru copia depozitului"
+
+msgid "Choose repository folder"
+msgstr "Alege folderul depozitului"
+
+msgid "Copy into PC repository"
+msgstr "Copiază în depozitul de pe PC"
+
+msgid "Verify on PC"
+msgstr "Verifică pe PC"
+
+msgid "Test restore on PC"
+msgstr "Testează restaurarea pe PC"
+
+msgid "Open PC folder"
+msgstr "Deschide folderul PC"
+
+msgid "Transfer history"
+msgstr "Istoricul transferurilor"
+
+msgid "Verifying integrity…"
+msgstr "Se verifică integritatea…"
+
+msgid "Transferring encrypted data…"
+msgstr "Se transferă datele criptate…"
+
+msgid "Preparing encrypted export…"
+msgstr "Se pregătește exportul criptat…"
+
+msgid "Connecting for encrypted transfer…"
+msgstr "Se conectează pentru transferul criptat…"
+
+msgid "Copying snapshots into PC repository…"
+msgstr "Se copiază snapshoturile în depozitul de pe PC…"
+

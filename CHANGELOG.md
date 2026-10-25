@@ -2,6 +2,30 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.34 — 2026-10-25
+
+- Integrate independent execution, PC destination and SFTP/stream transfer choices in the Slint backup plan. Preserve legacy SFTP push destinations and migrate old plans with defaults for new fields.
+- Add folder/helper selection, live transfer progress/cancel, explicit SFTP resume, receipt history, local integrity check, isolated restore, and supported restic copy into a separately bound local repository. Add English/Romanian UI strings.
+- Extract only verified encrypted artifacts with a strict Restic layout allowlist; reject traversal, links, duplicate files and nonregular entries. Verify actual disk bytes before final download publication.
+- Add isolated Windows/Linux integration fixtures for all three transports and real Windows Restic restore/hash comparison. Update the README and roadmap. Helpers remain explicit external prerequisites; production NAS tests were not performed.
+
+## 0.33 — 2026-10-25
+
+- Add reverse SSH forwarding to an official maintained rest-server backend, using loopback listeners, ephemeral bcrypt-protected session credentials, append-only private repositories and per-server bindings/locks.
+- Support both direct SSH and explicitly PC-authorized Linux agent jobs. Run a full repository check after each backup before reporting success. Tear down the helper/forward on completion, failure or cancellation; never weaken SSH identity checks.
+- Verify direct and agent modes with two incremental snapshots and byte-checked Windows restores. Explicitly reject denied forwarding and wildcard/nonverifiable remote listeners.
+
+## 0.32 — 2026-10-25
+
+- Add bounded binary SSH artifact streaming with exact transfer/artifact identity, length, digest and completion framing, producer exit checks, timeout and cancellation. Never silently substitute SFTP; streaming retries from zero.
+- Test zero bytes, split framing, cancellation, digest corruption, missing completion, producer failure and disconnect using loopback SSH.
+
+## 0.31 — 2026-10-25
+
+- Add typed transfer states, identities, capabilities and receipts with collision guards, private partial files and atomic no-clobber publication.
+- Export one approved snapshot through supported Restic copy into a separate encrypted repository; download the immutable artifact over SFTP on the verified SSH session.
+- Support explicit resume only for the unchanged artifact/server/destination; test real encryption, cancellation/resume, host fingerprint rejection, metadata changes and malformed/missing/truncated sources.
+
 ## 0.30 — 2026-10-25
 
 - Make direct Restic-over-SSH the default backup executor; no ContainerSafe agent or agent.json is required. Keep the agent as an explicit advanced option and migrate existing plans to the direct default without discarding paths.

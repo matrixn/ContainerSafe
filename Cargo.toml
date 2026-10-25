@@ -1,13 +1,13 @@
 [package]
 name = "containersafe"
-version = "0.30.0"
+version = "0.34.0"
 edition = "2021"
 build = false
 default-run = "containersafe"
 
 [features]
 default = ["server-management"]
-server-management = ["dep:russh", "dep:tokio", "dep:keyring", "dep:directories", "dep:aes", "dep:cbc", "dep:md5"]
+server-management = ["dep:russh", "dep:russh-sftp", "dep:bcrypt", "dep:tar", "dep:tokio", "dep:keyring", "dep:directories", "dep:aes", "dep:cbc", "dep:md5"]
 
 [[bin]]
 name = "containersafe"
@@ -26,6 +26,10 @@ required-features = ["server-management"]
 name = "ssh_integration"
 required-features = ["server-management"]
 
+[[test]]
+name = "pc_transfers"
+required-features = ["server-management"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -37,7 +41,10 @@ zeroize = { version = "1", features = ["derive"] }
 tempfile = "3"
 keyring = { version = "3", optional = true, features = ["windows-native", "apple-native", "sync-secret-service"] }
 russh = { version = "=0.64.1", optional = true, default-features = false, features = ["ring", "rsa"] }
-tokio = { version = "1", optional = true, features = ["rt-multi-thread", "time", "net", "sync"] }
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "time", "net", "sync", "io-util", "macros"] }
+russh-sftp = { version = "=3.0.1", optional = true, default-features = false }
+bcrypt = { version = "=0.19.3", optional = true }
+tar = { version = "=0.4.46", optional = true, default-features = false }
 aes = { version = "0.9", optional = true }
 cbc = { version = "0.2", optional = true }
 md5 = { version = "0.8", optional = true }

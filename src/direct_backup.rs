@@ -18,6 +18,54 @@ pub fn execute(
     sources: &[PathBuf],
     action: Action,
 ) -> Result<Value, String> {
+    execute_internal(
+        connection,
+        DirectRequest {
+            executable,
+            password_file,
+            restore_root,
+            destination,
+            sources,
+        },
+        action,
+        None,
+    )
+}
+pub struct DirectRequest<'a> {
+    pub executable: &'a str,
+    pub password_file: &'a str,
+    pub restore_root: &'a str,
+    pub destination: &'a Destination,
+    pub sources: &'a [PathBuf],
+}
+pub fn execute_in_tunnel(
+    connection: &Connection,
+    request: DirectRequest<'_>,
+    action: Action,
+    session: &crate::transfer::reverse_tunnel::ReverseSession<'_>,
+) -> Result<Value, String> {
+    if connection.data_identity()? != session.source_identity()? {
+        return Err("PC repository server identity changed".into());
+    }
+    execute_internal(connection, request, action, Some(session))
+}
+fn execute_internal(
+    connection: &Connection,
+    request: DirectRequest<'_>,
+    action: Action,
+    session: Option<&crate::transfer::reverse_tunnel::ReverseSession<'_>>,
+) -> Result<Value, String> {
+    let DirectRequest {
+        executable,
+        password_file,
+        restore_root,
+        destination,
+        sources,
+    } = request;
+    if (destination.kind == crate::backup::DestinationKind::LocalPcRepository) != session.is_some()
+    {
+        return Err("Local PC repository requires a verified reverse tunnel".into());
+    }
     destination.validate()?;
     for value in [executable, password_file, restore_root] {
         if !value.starts_with('/') || value.contains(['\0', '\r', '\n']) {
@@ -62,7 +110,9 @@ pub fn execute(
         operation.into(),
         executable.into(),
         password_file.into(),
-        destination.location.clone(),
+        session
+            .map(|s| s.uri())
+            .unwrap_or_else(|| destination.location.clone()),
         restore_root.into(),
         snapshot.clone(),
         directory.clone(),
@@ -75,7 +125,18 @@ pub fn execute(
         arguments.push(value.into());
     }
     let started = Instant::now();
-    let output = connection.restic_script(SCRIPT, &arguments, 3600)?;
+    let output = if let Some(session) = session {
+        let auth = session.credentials();
+        let script=zeroize::Zeroizing::new(format!("set +x\nRESTIC_REST_USERNAME='repository'\nRESTIC_REST_PASSWORD='{}'\nexport RESTIC_REST_USERNAME RESTIC_REST_PASSWORD\n{}",auth.password,SCRIPT));
+        connection.restic_script_cancellable(
+            &script,
+            &arguments,
+            3600,
+            Some(&session.cancellation),
+        )?
+    } else {
+        connection.restic_script(SCRIPT, &arguments, 3600)?
+    };
     match operation {
         "init" => Ok(json!({"initialized":true})),
         "snapshots" => {

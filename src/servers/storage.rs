@@ -94,7 +94,7 @@ pub fn server_dir(root: &Path, id: Uuid) -> PathBuf {
     root.join("servers").join(id.to_string())
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DataIdentity {
     pub server_id: Uuid,
     pub host: String,

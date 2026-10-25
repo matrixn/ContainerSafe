@@ -20,6 +20,22 @@ struct PlanConfig {
     password_file: String,
     restore_root: String,
     secret_reference: Uuid,
+    #[serde(default = "Uuid::new_v4")]
+    pc_repository: Uuid,
+    #[serde(default)]
+    rest_server: String,
+    #[serde(default)]
+    transfer_directory: String,
+    #[serde(default)]
+    stream: bool,
+    #[serde(default)]
+    artifact: Option<containersafe::transfer::SourceIdentity>,
+    #[serde(default)]
+    local_restic: String,
+    #[serde(default)]
+    local_password_file: String,
+    #[serde(default)]
+    mirror_directory: String,
 }
 impl PlanConfig {
     fn new(destination: Destination) -> Self {
@@ -39,6 +55,14 @@ impl PlanConfig {
             endpoint,
             restic: "/usr/local/bin/restic".into(),
             secret_reference: Uuid::new_v4(),
+            pc_repository: Uuid::new_v4(),
+            rest_server: String::new(),
+            transfer_directory: String::new(),
+            stream: false,
+            artifact: None,
+            local_restic: String::new(),
+            local_password_file: String::new(),
+            mirror_directory: String::new(),
         }
     }
     fn validate(&self) -> Result<(), String> {
@@ -76,6 +100,7 @@ fn kind(index: i32) -> DestinationKind {
     match index {
         1 => DestinationKind::ThisComputer,
         2 => DestinationKind::Remote,
+        3 => DestinationKind::LocalPcRepository,
         _ => DestinationKind::ServerFolder,
     }
 }
@@ -84,6 +109,7 @@ fn index(kind: DestinationKind) -> i32 {
         DestinationKind::ServerFolder => 0,
         DestinationKind::ThisComputer => 1,
         DestinationKind::Remote => 2,
+        DestinationKind::LocalPcRepository => 3,
     }
 }
 fn show_result(ui: &ContainerSafeWindow, result: Result<String, String>) {
@@ -155,6 +181,12 @@ fn read_form(ui: &ContainerSafeWindow, previous: &PlanConfig) -> Result<PlanConf
     value.restic = ui.get_backup_restic().trim().into();
     value.password_file = ui.get_backup_password_file().trim().into();
     value.restore_root = ui.get_backup_restore_root().trim().into();
+    value.rest_server = ui.get_backup_rest_server().trim().into();
+    value.transfer_directory = ui.get_backup_transfer_directory().to_string();
+    value.stream = ui.get_backup_stream();
+    value.local_restic = ui.get_backup_local_restic().to_string();
+    value.local_password_file = ui.get_backup_local_password_file().to_string();
+    value.mirror_directory = ui.get_backup_mirror_directory().to_string();
     value.validate()?;
     Ok(value)
 }
@@ -212,12 +244,16 @@ consistency are not provided. No running container is stopped or modified.
             ),
         )
         .map_err(|e| e.to_string())?;
+        export_pc_setup(config, &folder)?;
         return Ok(());
     }
     let agent = AgentConfig {
         restic_executable: config.restic.clone().into(),
         timeout_seconds: 3600,
         jobs: vec![JobConfig {
+            pc_repository: (config.destination.kind == DestinationKind::LocalPcRepository)
+                .then_some(config.pc_repository),
+            pc_only: config.destination.kind == DestinationKind::LocalPcRepository,
             id: config.endpoint.job_id,
             repository: RepositoryConfig {
                 path: config.destination.location.clone().into(),
@@ -282,7 +318,42 @@ Backups on the same disk are not protection against loss of that disk.
         ),
     )
     .map_err(|e| e.to_string())?;
+    export_pc_setup(config, &directory)?;
     Ok(())
+}
+fn export_pc_setup(config: &PlanConfig, directory: &Path) -> Result<(), String> {
+    if config.destination.kind != DestinationKind::LocalPcRepository {
+        return Ok(());
+    }
+    fs::write(
+        directory.join("PC_BACKUP.md"),
+        format!(
+            r#"# Direct PC repository
+
+This plan uses repository UUID {id}. The saved PC folder is descriptive on the NAS;
+never pass that Windows path to Linux Restic. ContainerSafe creates a fresh,
+authenticated loopback reverse SSH tunnel for each operation. The helper is the
+official restic/rest-server 0.14.0 executable, selected on the PC, not on the NAS.
+
+Allow reverse TCP forwarding for this SSH account, bound to 127.0.0.1 only.
+ContainerSafe refuses wildcard or unverified listeners and never changes sshd.
+Keep the PC awake. No inbound SSH/SFTP server on the PC is needed.
+Save the plan, initialize once, then back up through ContainerSafe.
+Repository files are under <PC folder>/<server UUID>/{id}/repository.
+
+For agent mode, install the exported agent.json with its pc_repository and pc_only
+authorization using agent 0.34 or later. Normal NAS repository operations are
+disabled for this job. For direct mode no agent/config is required.
+The existing NAS password file and approved source permissions still apply.
+For local checks/restores, independently create a protected password file on the PC
+containing the same repository password; it is never downloaded from the NAS.
+Interrupted operations may leave Restic locks: inspect before retrying; never
+automatically unlock/prune or restore into live data.
+"#,
+            id = config.pc_repository
+        ),
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn activity(root: &Path, id: Uuid) -> Result<String, String> {
@@ -326,6 +397,8 @@ fn record(
 }
 
 pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedState) {
+    use containersafe::transfer::{CancellationToken, ProgressSink, TransferProgress};
+    let cancellation = Rc::new(RefCell::new(None::<CancellationToken>));
     let default_path = root.join("backup-default.json");
     let defaults: Result<Destination, String> = load(&default_path);
     if let Ok(defaults) = &defaults {
@@ -407,7 +480,9 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
             let config = configs.get(&app.application).cloned().unwrap_or_else(|| {
                 let mut destination =
                     load::<Destination>(&root.join("backup-default.json")).unwrap_or_default();
-                if !destination.location.is_empty() {
+                if !destination.location.is_empty()
+                    && destination.kind != DestinationKind::LocalPcRepository
+                {
                     // Separate repositories per plan; do not mix container backups.
                     let suffix = app
                         .application
@@ -459,6 +534,12 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
             ui.set_backup_restic(config.restic.clone().into());
             ui.set_backup_password_file(config.password_file.clone().into());
             ui.set_backup_restore_root(config.restore_root.clone().into());
+            ui.set_backup_rest_server(config.rest_server.clone().into());
+            ui.set_backup_transfer_directory(config.transfer_directory.clone().into());
+            ui.set_backup_stream(config.stream);
+            ui.set_backup_local_restic(config.local_restic.clone().into());
+            ui.set_backup_local_password_file(config.local_password_file.clone().into());
+            ui.set_backup_mirror_directory(config.mirror_directory.clone().into());
             ui.set_backup_acknowledged(false);
             ui.set_backup_snapshots(ModelRc::default());
             ui.set_backup_snapshot_index(0);
@@ -481,6 +562,21 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
     ui.on_backup_action(move |operation| {
         let Some(ui) = weak.upgrade() else { return; };
         let operation = operation.to_string();
+        if operation == "cancel-transfer" {
+            if let Some(token) = cancellation.borrow().as_ref() { token.cancel(); }
+            ui.set_connection_step(i18n::text("Cancelling transfer… Inspect snapshots before retrying.").into());
+            return;
+        }
+        if matches!(operation.as_str(), "browse-pc" | "browse-backend" | "browse-download" | "browse-mirror") && !ui.get_test_busy() {
+            if operation != "browse-backend" {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    if operation == "browse-download" { ui.set_backup_transfer_directory(path.display().to_string().into()); }
+                    else if operation == "browse-mirror" { ui.set_backup_mirror_directory(path.display().to_string().into()); }
+                    else { ui.set_backup_location(path.display().to_string().into()); }
+                }
+            } else if let Some(path) = rfd::FileDialog::new().pick_file() { ui.set_backup_rest_server(path.display().to_string().into()); }
+            return;
+        }
         if operation == "activity" {
             if let Ok(guard) = state.lock() {
                 let message = guard.server.as_ref().map(|s| activity(&root, s.id)).unwrap_or_else(|| Ok(i18n::text("Connect a server first.")));
@@ -503,6 +599,32 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         let selection = selection.clone();
         let sources = match approved_sources(app, &selection) { Ok(value) => value, Err(error) => { show_result(&ui, Err(error)); return; } };
         plan.config = match read_form(&ui, &plan.config) { Ok(value) => value, Err(error) => { show_result(&ui, Err(error)); return; } };
+        if operation == "transfer-history" {
+            let directory = storage::server_dir(&root,server.id).join("transfers/history");
+            let result = (|| -> Result<String,String> {
+                let mut lines=Vec::new();
+                if directory.exists() {for entry in fs::read_dir(directory).map_err(|e|e.to_string())? {
+                    let path=entry.map_err(|e|e.to_string())?.path();
+                    if path.extension().is_some_and(|e|e=="json") {
+                        let receipt:containersafe::transfer::TransferReceipt=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+                        if receipt.source.server_id==server.id {lines.push(format!("{:?} · {:?} · {} / {} bytes · SHA-256 {}\n{}",receipt.kind,receipt.state,receipt.bytes,receipt.source.size,receipt.sha256_verified,receipt.destination.directory.display()));}
+                    }
+                }}
+                if lines.is_empty(){Ok(i18n::text("No backup activity yet"))}else{Ok(lines.join("\n\n"))}
+            })();
+            show_result(&ui,result);return;
+        }
+        if operation == "open-folder" {
+            let result=(|| -> Result<String,String> {
+                let directory=fs::canonicalize(&plan.config.transfer_directory).map_err(|e|e.to_string())?;
+                if !directory.is_dir(){return Err("Choose an existing PC folder".into());}
+                #[cfg(target_os="windows")] let executable="explorer.exe";
+                #[cfg(target_os="linux")] let executable="xdg-open";
+                #[cfg(target_os="macos")] let executable="open";
+                std::process::Command::new(executable).arg(directory).spawn().map_err(|e|e.to_string())?;
+                Ok(String::new())
+            })();show_result(&ui,result);return;
+        }
         if matches!(operation.as_str(), "backup" | "init" | "restore") && !ui.get_backup_acknowledged() { return; }
         let persist = || -> Result<(), String> {
             let path = plan_path(&root, plan.server_id);
@@ -525,12 +647,19 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         let action = match operation.as_str() {
             "backup" => Action::BackupSelected { expected_sources: sources.clone(), expected_repository: plan.config.destination.location.clone().into() },
             "init" => Action::Init {}, "snapshots" => Action::Snapshots {}, "check" => Action::Check { read_data: true },
-            "restore" => match selected_snapshot { Some(snapshot_id) => Action::Restore { snapshot_id, directory: format!("test-{}", Uuid::new_v4()) }, None => { show_result(&ui, Err(i18n::text("List snapshots and select one first."))); return; } },
+            "export-artifact" | "download" | "resume" | "verify-local" | "restore-local" | "mirror" => Action::Snapshots {},
+            "restore" => match selected_snapshot.clone() { Some(snapshot_id) => Action::Restore { snapshot_id, directory: format!("test-{}", Uuid::new_v4()) }, None => { show_result(&ui, Err(i18n::text("List snapshots and select one first."))); return; } },
             _ => return,
         };
         let secret = Secret(guard.secret.0.clone());
+        let token = CancellationToken::default();
+        *cancellation.borrow_mut() = Some(token.clone());
+        let progress = Arc::new(Mutex::new(None::<TransferProgress>));
+        let updates = progress.clone();
+        let sink: ProgressSink = Arc::new(move |value| { if let Ok(mut latest) = updates.lock() { *latest = Some(value); } });
+        ui.set_backup_cancellable(plan.config.destination.kind == DestinationKind::LocalPcRepository || matches!(operation.as_str(), "download" | "resume"));
         guard.busy = true; ui.set_loading(true); ui.set_test_busy(true);
-        ui.set_connection_step(i18n::text(match operation.as_str() { "backup" => "Checking sources and creating encrypted backup…", "init" => "Initializing encrypted repository…", "check" => "Reading and checking all repository data…", "restore" => "Restoring to a new isolated directory…", _ => "Loading snapshots…" }).into());
+        ui.set_connection_step(i18n::text(match operation.as_str() { "backup" => "Checking sources and creating encrypted backup…", "init" => "Initializing encrypted repository…", "check" => "Reading and checking all repository data…", "restore" | "restore-local" => "Restoring to a new isolated directory…", "export-artifact" => "Preparing encrypted export…", "download" | "resume" => "Connecting for encrypted transfer…", "verify-local" => "Verifying integrity…", "mirror" => "Copying snapshots into PC repository…", _ => "Loading snapshots…" }).into());
         drop(guard);
         let state = state.clone(); let root = root.clone(); let weak = weak.clone(); let opened = opened.clone();
         // Rc stays on the UI thread; worker results are delivered through the event loop.
@@ -538,15 +667,107 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         std::thread::spawn(move || {
             let result = (|| -> Result<serde_json::Value, String> {
                 let profiles = storage::Profiles::load(&root)?;
+                if matches!(operation.as_str(), "verify-local" | "restore-local" | "mirror") {
+                    let endpoint = format!("[{}]:{}",server.host.to_ascii_lowercase(),server.port);
+                    let identity=storage::DataIdentity{server_id:server.id,host:server.host.to_ascii_lowercase(),port:server.port,
+                        host_key:profiles.hosts.get(&endpoint).cloned().ok_or("No saved verified SSH identity for this server")?};
+                    use containersafe::{restic::{ResticEngine, RepositorySecret}, transfer::{local_artifact, local_backend::RepositoryContext, TransferReceipt}};
+                    let engine = ResticEngine::new(&plan.config.local_restic).map_err(|e| e.to_string())?.with_timeout(Duration::from_secs(21600)).map_err(|e|e.to_string())?;
+                    let password_path = Path::new(&plan.config.local_password_file);
+                    let meta = fs::symlink_metadata(password_path).map_err(|_| "Local repository password file is unavailable")?;
+                    if !password_path.is_absolute() || !meta.is_file() || meta.file_type().is_symlink() || meta.len()>65536 {return Err("Invalid local password file".into());}
+                    let mut password = fs::read_to_string(password_path).map_err(|_| "Cannot read local repository password file")?;
+                    while password.ends_with(['\r','\n']) {password.pop();}
+                    let secret = RepositorySecret::new(plan.config.secret_reference,password).map_err(|e|e.to_string())?;
+                    let mut extracted = None;
+                    let mut context = None;
+                    let repository = if plan.config.destination.kind == DestinationKind::LocalPcRepository {
+                        context = Some(RepositoryContext::open(Path::new(&plan.config.destination.location),plan.config.pc_repository,identity.clone()).map_err(|e|e.to_string())?);
+                        context.as_ref().unwrap().repository.clone()
+                    } else {
+                        let source = plan.config.artifact.as_ref().ok_or("Create and download an encrypted export first")?;
+                        let path=storage::server_dir(&root,server.id).join("transfers").join(format!("{}.json",source.artifact_id));
+                        let receipt:TransferReceipt=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+                        if &receipt.source != source || source.server_id!=identity.server_id || source.host_key!=identity.host_key || source.endpoint!=endpoint {return Err("Artifact identity changed".into());}
+                        extracted=Some(local_artifact::extract(&receipt,&token).map_err(|e|e.to_string())?);
+                        extracted.as_ref().unwrap().repository()
+                    };
+                    let repository=RepositoryConfig{path:repository,secret_reference:plan.config.secret_reference};
+                    engine.check(&repository,&secret,true).map_err(|e|e.to_string())?;
+                    let snapshots=engine.snapshots(&repository,&secret).map_err(|e|e.to_string())?;
+                    let message=if operation=="mirror" {
+                        if plan.config.destination.kind == DestinationKind::LocalPcRepository {return Err("Repository is already on this PC".into());}
+                        let destination=RepositoryContext::open(Path::new(&plan.config.mirror_directory),plan.config.pc_repository,identity.clone()).map_err(|e|e.to_string())?;
+                        let target=RepositoryConfig{path:destination.repository.clone(),secret_reference:plan.config.secret_reference};
+                        if !target.path.exists() {engine.init(&target,&secret).map_err(|e|e.to_string())?;}
+                        let ids=snapshots.iter().map(|s|s.id.clone()).collect::<Vec<_>>();
+                        engine.copy_snapshots(&repository,&secret,&target,&secret,&ids).map_err(|e|e.to_string())?;
+                        engine.check(&target,&secret,true).map_err(|e|e.to_string())?;
+                        format!("Verified repository copy: {}",target.path.display())
+                    } else if operation=="restore-local" {
+                        let snapshot=if plan.config.destination.kind == DestinationKind::LocalPcRepository { selected_snapshot.as_deref().ok_or("Select an exact snapshot first")? } else { snapshots.first().ok_or("Empty artifact repository")?.id.as_str() };
+                        let base=fs::canonicalize(&plan.config.transfer_directory).map_err(|_|"Choose an existing PC folder for the isolated restore")?;
+                        let target=base.join(format!("containersafe-test-restore-{}",Uuid::new_v4()));
+                        let restored=engine.restore(&repository,&secret,snapshot,None,&target).map_err(|e|e.to_string())?;
+                        if !restored.content_verified {return Err("Restore integrity was not verified".into());}
+                        format!("Verified isolated restore: {}",restored.target.display())
+                    } else {"All local repository data verified".into()};
+                    drop(context);drop(extracted);
+                    return Ok(serde_json::json!({"message":message}));
+                }
                 let connection = Connection::open(&server, &secret, &profiles.hosts).map_err(|e| match e {
                     Failure::Message(message) => message,
                     _ => i18n::text("SSH host identity is unknown or changed. Connection blocked."),
                 })?;
+                if operation == "export-artifact" {
+                    if plan.config.destination.kind == DestinationKind::LocalPcRepository { return Err("PC repositories do not need a NAS export".into()); }
+                    let snapshot = selected_snapshot.as_deref().ok_or_else(|| i18n::text("List snapshots and select one first."))?;
+                    let source = containersafe::transfer::artifact::create(&connection, &containersafe::transfer::artifact::ExportRequest {
+                        plan_id: plan.config.endpoint.job_id, restic: &plan.config.restic, password_file: &plan.config.password_file,
+                        restore_root: &plan.config.restore_root, destination: &plan.config.destination, approved_sources: &sources, snapshot_id: snapshot,
+                    })?;
+                    return serde_json::to_value(source).map_err(|e| e.to_string());
+                }
+                if matches!(operation.as_str(), "download" | "resume") {
+                    use containersafe::transfer::{Coordinator, TransferKind, TransferReceipt};
+                    let source = plan.config.artifact.clone().ok_or("Create an encrypted export first")?;
+                    let folder = PathBuf::from(&plan.config.transfer_directory);
+                    let directory = storage::server_dir(&root, server.id).join("transfers");
+                    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+                    let receipt_path = directory.join(format!("{}.json", source.artifact_id));
+                    let kind = if plan.config.stream { TransferKind::SshStream } else { TransferKind::SftpPull };
+                    let receipt: TransferReceipt = if operation == "resume" {
+                        if kind != TransferKind::SftpPull { return Err("Streaming cannot resume. Start a new transfer.".into()); }
+                        let old: TransferReceipt = serde_json::from_slice(&fs::read(&receipt_path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+                        if old.source != source || old.destination.directory != fs::canonicalize(folder).map_err(|e| e.to_string())? { return Err("Resume identity or destination changed".into()); }
+                        old
+                    } else { TransferReceipt::new(source, folder, kind).map_err(|e| e.to_string())? };
+                    let coordinator = Coordinator::open(receipt, &receipt_path, sink, token).map_err(|e| e.to_string())?;
+                    let result = if kind == TransferKind::SftpPull { containersafe::transfer::sftp_pull::download(&connection, coordinator) }
+                        else { containersafe::transfer::ssh_stream::receive(&connection, coordinator) };
+                    if let Ok(bytes) = fs::read(&receipt_path) {
+                        if let Ok(receipt) = serde_json::from_slice::<TransferReceipt>(&bytes) {
+                            fs::create_dir_all(directory.join("history")).map_err(|e|e.to_string())?;
+                            save(&directory.join("history").join(format!("{}.json",receipt.id)),&receipt)?;
+                        }
+                    }
+                    let result=result.map_err(|e|e.to_string())?;
+                    return serde_json::to_value(result).map_err(|e| e.to_string());
+                }
                 if matches!(action, Action::BackupSelected { .. }) {
                     let containers = containersafe::discover(&connection)?;
                     let current: BackupReport = serde_json::from_value(serde_json::to_value(containersafe::plan::build(&containers)).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
                     let app = current.applications.iter().find(|app| app.application == plan.application).ok_or_else(|| i18n::text("Inventory changed. Refresh and review your selections."))?;
                     if approved_sources(app, &selection)? != sources { return Err(i18n::text("Inventory changed. Refresh and review your selections.")); }
+                }
+                if plan.config.destination.kind == DestinationKind::LocalPcRepository {
+                    use containersafe::transfer::{pc_backup, reverse_tunnel::ReverseSession};
+                    let session = ReverseSession::open(&connection, Path::new(&plan.config.rest_server),
+                        Path::new(&plan.config.destination.location), plan.config.pc_repository, token, sink).map_err(|e| e.to_string())?;
+                    return pc_backup::execute(&connection, containersafe::direct_backup::DirectRequest {
+                        executable: &plan.config.restic, password_file: &plan.config.password_file,
+                        restore_root: &plan.config.restore_root, destination: &plan.config.destination, sources: &sources,
+                    }, plan.config.use_agent.then_some(&plan.config.endpoint), action, &session);
                 }
                 if !plan.config.use_agent {
                     return containersafe::direct_backup::execute(&connection, &plan.config.restic,
@@ -565,6 +786,14 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         });
         let timer = Rc::new(Timer::default()); let keep = timer.clone();
         timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
+            if let Some(ui) = weak.upgrade() {
+                if let Ok(latest) = progress.lock() { if let Some(p) = latest.as_ref() {
+                    let label=i18n::text(match p.state {containersafe::transfer::TransferState::VerifyingIntegrity=>"Verifying integrity…",_=>"Transferring encrypted data…"});
+                    let mut text=format!("{label}\n{:.1} MiB · {:.1} MiB/s · {:.0}s",p.bytes as f64/1048576.0,p.bytes_per_second/1048576.0,p.elapsed_seconds);
+                    if p.total>0 {text.push_str(&format!("\n{:.0}% · ETA {:.0}s",p.bytes as f64/p.total as f64*100.0,p.total.saturating_sub(p.bytes) as f64/p.bytes_per_second.max(1.0)));}
+                    ui.set_connection_step(text.into());
+                } }
+            }
             let (result, root, server_id, application, operation) = match receiver.try_recv() {
                 Ok(value) => value,
                 Err(mpsc::TryRecvError::Empty) => return,
@@ -582,8 +811,25 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
             if let Ok(mut guard) = state.lock() { guard.busy = false; }
             let Some(ui) = weak.upgrade() else { return; };
             ui.set_loading(false); ui.set_test_busy(false);
+            ui.set_backup_cancellable(false);
             let message = result.and_then(|value| -> Result<String, String> {
                 match operation.as_str() {
+                    "verify-local" | "restore-local" | "mirror" => Ok(value["message"].as_str().ok_or("Invalid local operation result")?.to_string()),
+                    "export-artifact" => {
+                        let source: containersafe::transfer::SourceIdentity = serde_json::from_value(value).map_err(|e| e.to_string())?;
+                        if let Some(plan) = opened.borrow_mut().as_mut() {
+                            plan.config.artifact = Some(source);
+                            let path = plan_path(&root, server_id);
+                            let mut plans: Plans = load(&path)?;
+                            plans.insert(plan.application.clone(), plan.config.clone()); save(&path, &plans)?;
+                        }
+                        Ok(i18n::text("Encrypted export ready. Choose a PC folder and download."))
+                    }
+                    "download" | "resume" => {
+                        let receipt: containersafe::transfer::TransferReceipt = serde_json::from_value(value).map_err(|e| e.to_string())?;
+                        if !receipt.sha256_verified || receipt.state != containersafe::transfer::TransferState::Completed { return Err("Transfer was not verified".into()); }
+                        Ok(format!("SHA-256 verified · {} bytes\n{}", receipt.bytes, receipt.destination.directory.join(format!("{}.csbackup.tar", receipt.source.artifact_id)).display()))
+                    }
                     "backup" => {
                         let backup: BackupResult = serde_json::from_value(value).map_err(|_| "Invalid backup result")?;
                         if !valid_snapshot(&backup.snapshot_id) { return Err("Invalid snapshot identity".into()); }
@@ -628,6 +874,55 @@ fn valid_snapshot(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn old_sftp_plan_migrates_without_changing_destination_or_secret() {
+        let destination = Destination {
+            kind: DestinationKind::ThisComputer,
+            location: "sftp:backup-pc:/C:/Backup".into(),
+        };
+        let config = PlanConfig::new(destination.clone());
+        let reference = config.secret_reference;
+        let mut legacy = serde_json::to_value(config).unwrap();
+        for key in [
+            "pc_repository",
+            "rest_server",
+            "transfer_directory",
+            "stream",
+            "artifact",
+            "local_restic",
+            "local_password_file",
+            "mirror_directory",
+        ] {
+            legacy.as_object_mut().unwrap().remove(key);
+        }
+        let migrated: PlanConfig = serde_json::from_value(legacy).unwrap();
+        assert_eq!(migrated.destination, destination);
+        assert_eq!(migrated.secret_reference, reference);
+        assert!(!migrated.pc_repository.is_nil());
+        assert!(!migrated.stream);
+        assert!(migrated.artifact.is_none());
+        assert_eq!(index(migrated.destination.kind), 1);
+        assert_eq!(kind(3), DestinationKind::LocalPcRepository);
+    }
+    #[test]
+    fn pc_agent_export_authorizes_only_its_stable_repository() {
+        let root = tempfile::tempdir().unwrap();
+        let mut config = PlanConfig::new(Destination {
+            kind: DestinationKind::LocalPcRepository,
+            location: root.path().display().to_string(),
+        });
+        config.use_agent = true;
+        export_setup(&config, &[PathBuf::from("/srv/demo")], root.path()).unwrap();
+        let folder = fs::read_dir(root.path())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let exported: AgentConfig = read_json(&folder.join("agent.json")).unwrap();
+        assert!(exported.jobs[0].pc_only);
+        assert_eq!(exported.jobs[0].pc_repository, Some(config.pc_repository));
+    }
     #[test]
     fn direct_mode_is_default_migrates_old_plans_and_exports_no_agent_config() {
         let root = tempfile::tempdir().unwrap();

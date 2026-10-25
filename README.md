@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.30** · Next releases increment by **0.01** (0.31, 0.32, …).
+**Version 0.34** · Next releases increment by **0.01** (0.35, 0.36, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -56,7 +56,13 @@ ContainerSafe aims to make these dependencies **visible, reviewable, and recover
 | Restic lab: init, backup, integrity check, restore | ✅ Local test | Disposable Windows test data only; two-snapshot test passed |
 | Native Slint UI | 🧪 Preview | Manages SSH servers and uses the shared Rust core for discovery/validation |
 | Startup splash / stage status | 🧪 Preview | Slint screen with real startup steps, not fake loading animation |
-| Production Docker backups | ⏳ Planned | Agent, destination handling, scheduling, safe execution |
+| Manual encrypted file backup | ✅ Tested in isolated fixtures | Direct Restic over verified SSH or optional configured Linux agent |
+| SFTP pull to PC | ✅ Windows/Linux fixture | Immutable encrypted export, SHA-256 readback, explicit resume |
+| Binary SSH streaming to PC | ✅ Windows/Linux fixture | Framed binary payload, exact length/digest/completion; retry from start |
+| Direct encrypted PC repository | ✅ Windows/Linux fixture | Loopback reverse SSH forwarding to official rest-server; direct and agent modes |
+| Local artifact check / restore / repository copy | ✅ Core integration tests | Strict Restic archive layout; restic copy preserves snapshots; isolated restores |
+| Per-server transfer history and cancellation | 🧪 Desktop preview | Persistent artifact receipts, live bytes/rate/elapsed; ETA for known lengths |
+| Production backup orchestration | ⏳ Planned | Scheduling, retention and application consistency remain unavailable |
 | Database-consistent full-stack restore | ⏳ Planned | Restore drills and application-level checks |
 
 **Principle:** *A successful snapshot is not the same thing as a successful restore.*
@@ -73,10 +79,10 @@ ContainerSafe (Rust)
 │   ├── ui/                   # Native view definitions + splash
 │   └── src/                  # Rust UI orchestration
 │
-└── Restic lab                # Local experimental backup/restore tests
+├── transfer/                 # SFTP pull, binary SSH stream, reverse SSH forwarding
+├── containersafe-agent       # Optional configured Linux stdio executor
+└── Restic engine             # Encrypted snapshots, copy, data check, isolated restore
 
-Planned refactor:
-containersafe-core → containersafe-cli / containersafe-native / containersafe-agent
 ```
 
 The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. Direct Restic-over-SSH and the optional Linux agent support manual file backup/restore through the desktop; production database orchestration remains future work.
@@ -174,12 +180,83 @@ The Linux `containersafe-agent` binary now exposes versioned JSON requests over 
 - [ ] Docker/database orchestration with least-privilege considerations
 - [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies
 - [ ] PostgreSQL-consistent backup adapter and disposable integration tests
-- [x] Default backup destinations and per-plan overrides (server folder, SFTP, HTTPS S3)
+- [x] Default backup destinations and per-plan overrides (server folder, SFTP, HTTPS S3, PC reverse tunnel)
+- [x] English/Romanian preferences, autosave, explicit opt-in reconnect and ten loading animations
+- [x] Light interface, Compose tree, backup plans filtered to enabled selections, per-row server actions
+- [x] Compact centered splash, readable native text, Help preview and Escape dismissal
+- [x] Modern password/key SSH authentication without OpenSSL; strict host identity pinning
+- [x] Immutable encrypted snapshot exports through supported Restic copy
+- [x] SFTP pull with guarded explicit resume, binary streaming with strict completion checks
+- [x] Authenticated loopback reverse SSH tunnel for direct local PC repositories
+- [x] Direct and agent reverse-tunnel backups with two snapshots and verified Windows restores
+- [x] Unified transfer controls, progress/cancel, persistent artifact receipts/history and open folder
+- [x] Local artifact verification, isolated restore and supported repository copy
+- [ ] Persistent multi-item transfer queue, pause and automatic crash recovery
+- [ ] Native OS disk-full fault fixture and broader long-running/concurrency/disconnect coverage
+- [ ] Visual/end-to-end desktop automation of every transfer action on all supported systems
 - [ ] Backup scheduling and retention
 - [ ] Isolated application restore verification
-- [ ] Linux/macOS desktop testing and packaged releases
+- [ ] Live Linux desktop transfer validation and macOS build/package support (Windows MSI and Linux packaging workflow already exists)
 
 Suggestions and use cases are welcome in [GitHub Issues](https://github.com/matrixn/ContainerSafe/issues).
+
+## Backups and transfers to this PC (0.31–0.34)
+
+Backup execution, storage destination and download method are separate choices.
+The existing **This computer (SFTP)** destination still means that the NAS sends
+Restic data to an SSH/SFTP server on the PC. Its saved configuration is unchanged.
+
+| Goal | Select | Requirements |
+|---|---|---|
+| Back up directly to this PC | **This PC via SSH tunnel** | Existing PC folder, official rest-server executable, verified SSH server allowing reverse forwarding, Restic/password file on NAS |
+| Download an existing snapshot | **SFTP pull** | First list/select a snapshot and create its encrypted export; PC folder; SFTP subsystem on NAS |
+| Download without SFTP | **SSH binary streaming** | Same approved encrypted export; shell commands available over verified SSH |
+| Verify / restore downloaded data | **Verify on PC / Test restore on PC** | Local Restic and protected local repository password file; a new restore directory is created |
+| Keep snapshots in a local repository | **Copy into PC repository** | Verified downloaded artifact, local password file and dedicated local base folder; uses restic copy |
+
+For a reverse-tunnel destination, choose the folder and helper in the plan, save,
+initialize once, then **Back up now**. The physical repository lives under
+`<PC folder>/<server UUID>/<repository UUID>/repository`, with a binding file and
+exclusive operation lock. Backups automatically run a full data check before success.
+Agent mode additionally requires exporting/installing its updated PC-authorized job.
+No inbound SSH server or public HTTP listener is opened on the PC. The helper and
+forwarded listener exist only for that operation; the PC must remain awake/connected.
+
+For SFTP/streaming, first back up to a NAS/remote repository, list snapshots and select
+one, then **Create encrypted export**, choose a PC download folder and method, and
+**Download**. SFTP can explicitly resume the same artifact/destination after cancellation;
+streaming retries from the beginning. SHA-256 is checked against SSH-authenticated
+metadata and again against the written file before final publication. Existing files
+are never overwritten. Transfer history contains typed receipts, not credentials.
+
+The archive contains an isolated **encrypted Restic repository**, not plaintext files.
+It does not include the repository password. Supply that password yourself in a
+protected local file when checking/restoring on PC; the app never fetches the NAS
+password file. Retain a secure independent password copy. Lost passwords cannot be recovered.
+Exporting requires temporary NAS space for a new repository plus its archive; exports
+and cancelled partial files are not automatically deleted. Repository copy imports
+snapshots and preserves existing ones; it does not mirror deletions or retention.
+
+Install the optional Windows x64 helper explicitly with:
+
+```powershell
+./scripts/get-rest-server.ps1 -Destination C:/Tools/ContainerSafeRestServer
+```
+
+The script verifies a pinned official rest-server 0.14.0 SHA-256 before extraction,
+refuses an existing destination and does not change PATH or install a service.
+Restic/rest-server executables are separate prerequisites, not bundled in the MSI.
+See [transfer architecture, validation and limitations](docs/PC_TRANSFERS.md) and
+[official rest-server](https://github.com/restic/rest-server).
+
+The integration suite uses disposable Linux SSH/Restic data and Windows Restic.
+These results do not establish production DSM backup compatibility for every share,
+ACL or application. Raw live database volumes remain blocked. There are no database
+logical dumps, application consistency guarantees, automatic schedules or retention.
+Cancellation cannot guarantee that every remote descendant has exited; after an
+interruption inspect snapshots/locks, then retry. No automatic `unlock`, prune or
+live-data restore is performed. Local verification uses the saved pinned server identity and its local binding;
+it does not open a new SSH connection.
 
 ## Security by design
 

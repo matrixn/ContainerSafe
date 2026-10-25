@@ -10,7 +10,27 @@ use std::{
     time::{Duration, Instant},
 };
 use uuid::Uuid;
+use zeroize::Zeroize;
 use zeroize::Zeroizing;
+
+/// Session-only REST authentication. Serializable only for the encrypted SSH
+/// request to the agent; never put this value in configuration or activity.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RestCredentials {
+    pub username: String,
+    pub password: String,
+}
+impl std::fmt::Debug for RestCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RestCredentials([REDACTED])")
+    }
+}
+impl Drop for RestCredentials {
+    fn drop(&mut self) {
+        self.password.zeroize();
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RepositoryConfig {
@@ -20,8 +40,15 @@ pub struct RepositoryConfig {
 
 /// Remote locations are passed as one argument to Restic, never a shell.
 pub fn remote_repository(path: &Path) -> bool {
-    path.to_str()
-        .is_some_and(|value| value.starts_with("sftp:") || value.starts_with("s3:https://"))
+    path.to_str().is_some_and(|value| {
+        value.starts_with("sftp:")
+            || value.starts_with("s3:https://")
+            || value
+                .strip_prefix("rest:http://127.0.0.1:")
+                .and_then(|suffix| suffix.strip_suffix("/repository/"))
+                .and_then(|port| port.parse::<u16>().ok())
+                .is_some_and(|port| port > 0)
+    })
 }
 pub fn valid_repository(path: &Path) -> bool {
     let Some(value) = path.to_str() else {
@@ -135,6 +162,7 @@ pub struct ResticEngine {
     executable: PathBuf,
     timeout: Duration,
     output_limit: u64,
+    rest_auth: Option<(String, Zeroizing<String>)>,
 }
 impl ResticEngine {
     /// Pass a configured path, or explicitly pass "restic" to use PATH lookup.
@@ -147,6 +175,7 @@ impl ResticEngine {
             executable,
             timeout: Duration::from_secs(300),
             output_limit: 16 * 1024 * 1024,
+            rest_auth: None,
         })
     }
     pub fn with_timeout(mut self, timeout: Duration) -> Result<Self, ResticError> {
@@ -155,6 +184,10 @@ impl ResticEngine {
         }
         self.timeout = timeout;
         Ok(self)
+    }
+    pub(crate) fn with_rest_credentials(mut self, auth: &RestCredentials) -> Self {
+        self.rest_auth = Some((auth.username.clone(), Zeroizing::new(auth.password.clone())));
+        self
     }
 
     fn validate(
@@ -199,6 +232,15 @@ impl ResticEngine {
             .env_remove("RESTIC_REPOSITORY_FILE")
             .env_remove("RESTIC_HOST")
             .stdin(Stdio::null());
+        if let Some((username, password)) = &self.rest_auth {
+            command
+                .env("RESTIC_REST_USERNAME", username)
+                .env("RESTIC_REST_PASSWORD", password.as_str());
+        } else {
+            command
+                .env_remove("RESTIC_REST_USERNAME")
+                .env_remove("RESTIC_REST_PASSWORD");
+        }
         command
     }
 
@@ -318,6 +360,35 @@ impl ResticEngine {
             return Err(error("snapshots", ResticErrorKind::InvalidResponse));
         }
         Ok(snapshots)
+    }
+
+    /// Import exact snapshots through Restic's supported transaction protocol.
+    /// Never merge repository directories or put passwords in command arguments.
+    pub fn copy_snapshots(
+        &self,
+        from: &RepositoryConfig,
+        from_secret: &RepositorySecret,
+        to: &RepositoryConfig,
+        to_secret: &RepositorySecret,
+        snapshots: &[String],
+    ) -> Result<(), ResticError> {
+        self.validate(from, from_secret)?;
+        self.validate(to, to_secret)?;
+        if snapshots.is_empty() || snapshots.iter().any(|s| !valid_snapshot(s)) {
+            return Err(error("copy", ResticErrorKind::InvalidConfiguration));
+        }
+        let mut args = vec![
+            OsString::from("--from-repo"),
+            restic_path(&from.path).into(),
+        ];
+        args.extend(snapshots.iter().map(OsString::from));
+        let mut command = self.command(to, to_secret, "copy", &args);
+        command
+            .env("RESTIC_FROM_PASSWORD", from_secret.password.as_str())
+            .env_remove("RESTIC_FROM_PASSWORD_FILE")
+            .env_remove("RESTIC_FROM_PASSWORD_COMMAND");
+        self.execute(command, "copy")?;
+        Ok(())
     }
 
     pub fn backup(
@@ -537,6 +608,17 @@ mod tests {
 
     #[test]
     fn remote_backends_preserve_strict_ssh_and_https() {
+        assert!(remote_repository(Path::new(
+            "rest:http://127.0.0.1:12345/repository/"
+        )));
+        for location in [
+            "rest:http://127.0.0.1:12345@external.example/repository/",
+            "rest:http://0.0.0.0:12345/repository/",
+            "rest:http://127.0.0.1:0/repository/",
+            "rest:http://127.0.0.1:12345/other/",
+        ] {
+            assert!(!remote_repository(Path::new(location)), "{location}");
+        }
         let reference = Uuid::new_v4();
         let secret = RepositorySecret::new(reference, "fixture-password".into()).unwrap();
         let engine = ResticEngine::new("restic").unwrap();
