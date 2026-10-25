@@ -18,6 +18,20 @@ pub struct RepositoryConfig {
     pub secret_reference: Uuid,
 }
 
+/// Remote locations are passed as one argument to Restic, never a shell.
+pub fn remote_repository(path: &Path) -> bool {
+    path.to_str()
+        .is_some_and(|value| value.starts_with("sftp:") || value.starts_with("s3:https://"))
+}
+pub fn valid_repository(path: &Path) -> bool {
+    let Some(value) = path.to_str() else {
+        return false;
+    };
+    !value.is_empty()
+        && !value.contains(['\0', '\r', '\n'])
+        && (path.is_absolute() || remote_repository(path))
+}
+
 /// A caller supplies the secret matching the persisted reference. Never serialize it.
 pub struct RepositorySecret {
     reference: Uuid,
@@ -57,13 +71,13 @@ pub struct BackupResult {
     pub total_duration: f64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckResult {
     pub all_data_read: bool,
     pub elapsed_seconds: f64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RestoreResult {
     pub snapshot_id: String,
     pub target: PathBuf,
@@ -148,7 +162,7 @@ impl ResticEngine {
         repo: &RepositoryConfig,
         secret: &RepositorySecret,
     ) -> Result<(), ResticError> {
-        if !repo.path.is_absolute() || repo.secret_reference.is_nil() {
+        if !valid_repository(&repo.path) || repo.secret_reference.is_nil() {
             return Err(error("configure", ResticErrorKind::InvalidConfiguration));
         }
         if repo.secret_reference != secret.reference {
@@ -165,8 +179,16 @@ impl ResticEngine {
         args: &[OsString],
     ) -> Command {
         let mut command = Command::new(&self.executable);
+        command.args(["--json", "--no-cache"]);
+        if repo.path.to_string_lossy().starts_with("sftp:") {
+            // Never inherit a permissive SSH host policy from the user's config.
+            command.args([
+                "-o",
+                "sftp.command=ssh -oBatchMode=yes -oStrictHostKeyChecking=yes",
+            ]);
+        }
         command
-            .args(["--json", "--no-cache", "--repo"])
+            .arg("--repo")
             .arg(restic_path(&repo.path))
             .arg(operation)
             .args(args)
@@ -273,7 +295,7 @@ impl ResticEngine {
         secret: &RepositorySecret,
     ) -> Result<(), ResticError> {
         self.validate(repo, secret)?;
-        if repo.path.exists() {
+        if !remote_repository(&repo.path) && repo.path.exists() {
             let mut entries = fs::read_dir(&repo.path)
                 .map_err(|_| error("init", ResticErrorKind::RepositoryExists))?;
             if entries.next().is_some() {
@@ -305,8 +327,14 @@ impl ResticEngine {
         sources: &[PathBuf],
     ) -> Result<BackupResult, ResticError> {
         self.validate(repo, secret)?;
-        let repository = fs::canonicalize(&repo.path)
-            .map_err(|_| error("backup", ResticErrorKind::RepositoryMissing))?;
+        let repository = if remote_repository(&repo.path) {
+            None
+        } else {
+            Some(
+                fs::canonicalize(&repo.path)
+                    .map_err(|_| error("backup", ResticErrorKind::RepositoryMissing))?,
+            )
+        };
         if sources.is_empty() {
             return Err(error("backup", ResticErrorKind::UnsafeSource));
         }
@@ -317,7 +345,10 @@ impl ResticEngine {
             }
             let source = fs::canonicalize(source)
                 .map_err(|_| error("backup", ResticErrorKind::UnsafeSource))?;
-            if source.starts_with(&repository) || repository.starts_with(&source) {
+            if repository
+                .as_ref()
+                .is_some_and(|repo| source.starts_with(repo) || repo.starts_with(&source))
+            {
                 return Err(error("backup", ResticErrorKind::UnsafeSource));
             }
             args.push(restic_path(&source).into_os_string());
@@ -393,9 +424,18 @@ impl ResticEngine {
             .file_name()
             .ok_or_else(|| error("restore", ResticErrorKind::UnsafeRestore))?;
         let target = parent.join(name);
-        let repository = fs::canonicalize(&repo.path)
-            .map_err(|_| error("restore", ResticErrorKind::RepositoryMissing))?;
-        if target.starts_with(&repository) || repository.starts_with(&target) {
+        let repository = if remote_repository(&repo.path) {
+            None
+        } else {
+            Some(
+                fs::canonicalize(&repo.path)
+                    .map_err(|_| error("restore", ResticErrorKind::RepositoryMissing))?,
+            )
+        };
+        if repository
+            .as_ref()
+            .is_some_and(|repo| target.starts_with(repo) || repo.starts_with(&target))
+        {
             return Err(error("restore", ResticErrorKind::UnsafeRestore));
         }
         // Atomic create refuses a racing existing target. On failure keep partial
@@ -493,6 +533,39 @@ mod tests {
             },
             RepositorySecret::new(reference, "fixture-secret-never-log".into()).unwrap(),
         )
+    }
+
+    #[test]
+    fn remote_backends_preserve_strict_ssh_and_https() {
+        let reference = Uuid::new_v4();
+        let secret = RepositorySecret::new(reference, "fixture-password".into()).unwrap();
+        let engine = ResticEngine::new("restic").unwrap();
+        for location in [
+            "sftp:backup-host:/repos/test",
+            "s3:https://storage.example/bucket/test",
+        ] {
+            let repo = RepositoryConfig {
+                path: location.into(),
+                secret_reference: reference,
+            };
+            assert!(engine.validate(&repo, &secret).is_ok());
+            let command = engine.command(&repo, &secret, "snapshots", &[]);
+            let args = command
+                .get_args()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            assert!(args.iter().any(|arg| arg == location));
+            if location.starts_with("sftp:") {
+                assert!(args
+                    .iter()
+                    .any(|arg| arg.contains("StrictHostKeyChecking=yes")
+                        && arg.contains("BatchMode=yes")));
+            }
+            assert!(!args.iter().any(|arg| arg.contains("no-check-certificate")));
+        }
+        assert!(!valid_repository(Path::new(
+            "s3:http://storage.example/bucket/test"
+        )));
     }
 
     #[test]

@@ -253,8 +253,10 @@ mod tests {
         fs::write(dir.path().join("settings.json"), r#"{"language":1}"#).unwrap();
         assert_eq!(Preferences::load(dir.path()).unwrap().loading_animation, 1);
         for animation in 0..10 {
-            let mut value = Preferences::default();
-            value.loading_animation = animation;
+            let value = Preferences {
+                loading_animation: animation,
+                ..Preferences::default()
+            };
             value.save(dir.path()).unwrap();
             assert_eq!(
                 Preferences::load(dir.path()).unwrap().loading_animation,

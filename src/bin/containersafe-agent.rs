@@ -15,7 +15,7 @@ fn main() {
             "{}",
             serde_json::json!({"protocol_version": PROTOCOL_VERSION,
             "application_version": containersafe::VERSION, "platform_supported": cfg!(target_os = "linux"),
-            "transport": "stdio-one-request", "operations": ["init", "backup", "snapshots", "check", "restore"]})
+            "transport": "stdio-one-request", "operations": ["describe", "init", "backup", "backup_selected", "snapshots", "check", "restore"]})
         );
         return;
     }

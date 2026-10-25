@@ -1,0 +1,98 @@
+import { Theme, ActionButton, ChoiceBox, ToggleCheck } from "theme.slint";
+import { SelectableText } from "selectable-text.slint";
+import { LineEdit, ScrollView } from "std-widgets.slint";
+
+export component BackupDestinationSettings inherits Rectangle {
+    in property <bool> default-mode: true;
+    in-out property <int> kind;
+    in-out property <string> location;
+    in property <string> status;
+    callback edited;
+    min-height: root.default-mode ? 220px : 180px; vertical-stretch: 0; background: white; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+    VerticalLayout { padding: 20px; spacing: 10px; alignment: start;
+        Text { text: root.default-mode ? @tr("Default backup destination") : @tr("Destination for this plan"); color: Theme.ink; font-size: 17px; font-weight: 700; }
+        SelectableText { text: root.default-mode ? @tr("New backup plans inherit this destination. Each plan can override it. Existing plans keep their destination.") : @tr("This destination applies only to this plan. Save the plan and update the agent configuration after changing it."); text-color: Theme.muted; wrap: word-wrap; }
+        HorizontalLayout { spacing: 14px;
+            ChoiceBox { width: 260px; model: [@tr("Folder on Docker server"), @tr("This computer (SFTP)"), @tr("Remote SFTP / S3")]; current-index <=> root.kind; selected(value) => { root.edited(); } }
+            LineEdit { text <=> root.location; placeholder-text: root.kind == 0 ? "/volume1/ContainerSafe/backups" : root.kind == 1 ? "sftp:backup-pc:/C:/ContainerSafe" : "s3:https://endpoint/bucket/containersafe"; edited => { root.edited(); } }
+        }
+        SelectableText { text: root.kind == 0 ? @tr("The folder is on the Docker server, not on this PC. Use a dedicated backup disk or share.") : root.kind == 1 ? @tr("The Docker server sends encrypted backups to this PC over SFTP. Enable an SSH/SFTP server on the PC, configure key authentication and pin its host key in the agent account's known_hosts.") : @tr("Use SFTP with a verified host key, or S3 over HTTPS. Configure S3 credentials in the agent account's protected AWS credentials file. Never put passwords in the URL."); text-color: Theme.muted; wrap: word-wrap; }
+        SelectableText { text: root.status; text-color: Theme.accent; wrap: word-wrap; }
+    }
+}
+
+export component BackupPanel inherits Rectangle {
+    in property <string> title;
+    in property <string> sources;
+    in-out property <int> kind;
+    in-out property <string> location;
+    in-out property <string> executable;
+    in-out property <string> config;
+    in-out property <string> job;
+    in-out property <string> restic;
+    in-out property <string> password-file;
+    in-out property <string> restore-root;
+    in-out property <bool> acknowledged;
+    in-out property <[string]> snapshots;
+    in-out property <int> snapshot-index;
+    in property <string> result;
+    in property <bool> error;
+    callback action(string);
+    background: white; border-radius: 12px;
+    VerticalLayout { padding: 24px; spacing: 12px;
+        Text { text: @tr("Manual backup") + " · " + root.title; color: Theme.ink; font-size: 20px; font-weight: 700; overflow: elide; }
+        ScrollView {
+            VerticalLayout { spacing: 12px;
+                SelectableText { text: @tr("Only the approved files below will be saved. Database logical dumps are not available in this version. Do not include live database volumes."); text-color: #976b20; wrap: word-wrap; }
+                SelectableText { text: root.sources; text-color: Theme.muted; wrap: word-wrap; }
+                BackupDestinationSettings { default-mode: false; kind <=> root.kind; location <=> root.location; }
+                Text { text: @tr("Linux agent on the selected Docker server"); color: Theme.ink; font-size: 15px; font-weight: 650; }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Agent executable"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.executable; }
+                }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Agent config file"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.config; }
+                }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Job identifier"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.job; read-only: true; }
+                }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Restic executable"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.restic; }
+                }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Password file on server"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.password-file; }
+                }
+                HorizontalLayout { spacing: 12px;
+                    Text { width: 150px; text: @tr("Isolated restore folder"); color: Theme.muted; vertical-alignment: center; }
+                    LineEdit { text <=> root.restore-root; }
+                }
+                SelectableText { text: @tr("First export the setup files, follow SETUP.md on the server, then initialize the repository once. Repository passwords stay on the server. The agent must be able to read the selected sources."); text-color: Theme.muted; wrap: word-wrap; }
+                HorizontalLayout { spacing: 10px;
+                    ActionButton { text: @tr("Initialize repository"); enabled: root.acknowledged; clicked => { root.action("init"); } }
+                }
+                HorizontalLayout { spacing: 10px;
+                    ActionButton { text: @tr("List snapshots"); clicked => { root.action("snapshots"); } }
+                    ActionButton { text: @tr("Check all data"); clicked => { root.action("check"); } }
+                }
+                if root.snapshots.length > 0 : HorizontalLayout { spacing: 10px;
+                    ChoiceBox { model: root.snapshots; current-index <=> root.snapshot-index; horizontal-stretch: 1; }
+                    ActionButton { text: @tr("Test restore"); enabled: root.acknowledged; clicked => { root.action("restore"); } }
+                }
+                SelectableText { text: root.result; selectable: root.error; text-color: root.error ? #a34431 : Theme.accent; wrap: word-wrap; }
+            }
+        }
+        ToggleCheck { text: @tr("I accept a file-level backup; application consistency and full recovery are not guaranteed."); checked <=> root.acknowledged; }
+        HorizontalLayout { spacing: 12px;
+            ActionButton { text: @tr("Save plan"); clicked => { root.action("save"); } }
+            ActionButton { text: @tr("Export setup"); clicked => { root.action("export"); } }
+            Rectangle { horizontal-stretch: 1; }
+            ActionButton { text: @tr("Back up now"); primary: true; enabled: root.acknowledged; clicked => { root.action("backup"); } }
+            ActionButton { text: @tr("Close"); clicked => { root.action("close"); } }
+        }
+    }
+}

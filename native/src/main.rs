@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+mod backup_ui;
 mod i18n;
 mod server_ui;
 mod settings;
@@ -779,6 +780,7 @@ fn create_main_window(
     let ui = ContainerSafeWindow::new()?;
     center_window_on_first_frame(ui.window());
     settings::install(&ui, root.clone(), state.clone());
+    backup_ui::install(&ui, root.clone(), state.clone());
     {
         let preview: Rc<RefCell<Option<SplashWindow>>> = Rc::new(RefCell::new(None));
         let main_weak = ui.as_weak();
@@ -1149,7 +1151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     if arguments
         .first()
-        .is_some_and(|arg| arg == "--preview-report")
+        .is_some_and(|arg| arg == "--preview-report" || arg == "--preview-backup")
     {
         if arguments.len() != 2 {
             return Err(
@@ -1178,6 +1180,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             true,
         )?;
         ui.set_active_server("Local preview · no server connection".into());
+        if arguments[0] == "--preview-backup" {
+            ui.set_backup_title("standalone/demo".into());
+            ui.set_backup_sources("/srv/demo/config\n/srv/demo/uploads".into());
+            ui.set_backup_location("/srv/backups/containersafe/demo".into());
+            ui.set_backup_executable("/usr/local/bin/containersafe-agent".into());
+            ui.set_backup_config("/home/backup/.config/containersafe/demo.json".into());
+            ui.set_backup_job("00000000-0000-4000-8000-000000000001".into());
+            ui.set_backup_restic("/usr/local/bin/restic".into());
+            ui.set_backup_password_file("/home/backup/.config/containersafe/demo.password".into());
+            ui.set_backup_restore_root("/home/backup/containersafe-restores".into());
+            ui.set_dialog(6);
+        }
         return ui.run().map_err(Into::into);
     }
     if !arguments.is_empty() {

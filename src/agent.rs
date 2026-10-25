@@ -15,7 +15,7 @@ use zeroize::Zeroizing;
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAX_REQUEST_BYTES: u64 = 64 * 1024;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentConfig {
     pub restic_executable: PathBuf,
@@ -27,7 +27,7 @@ fn default_timeout() -> u64 {
     300
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct JobConfig {
     pub id: Uuid,
@@ -49,7 +49,7 @@ pub enum Operation {
     Restore,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub protocol_version: u32,
@@ -58,9 +58,14 @@ pub struct Request {
     pub action: Action,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Action {
+    Describe {},
+    BackupSelected {
+        expected_sources: Vec<PathBuf>,
+        expected_repository: PathBuf,
+    },
     Init {},
     Backup {},
     Snapshots {},
@@ -76,6 +81,7 @@ pub enum Action {
 impl Action {
     fn operation(&self) -> Operation {
         match self {
+            Self::Describe {} | Self::BackupSelected { .. } => Operation::Backup,
             Self::Init {} => Operation::Init,
             Self::Backup {} => Operation::Backup,
             Self::Snapshots {} => Operation::Snapshots,
@@ -85,7 +91,7 @@ impl Action {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     InvalidRequest,
@@ -99,9 +105,10 @@ pub enum ErrorCode {
     SecretUnavailable,
     ResticFailed,
     Internal,
+    PlanChanged,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AgentError {
     pub code: ErrorCode,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -202,7 +209,7 @@ impl Agent {
             if job.id.is_nil()
                 || !ids.insert(job.id)
                 || job.repository.secret_reference.is_nil()
-                || !job.repository.path.is_absolute()
+                || !crate::restic::valid_repository(&job.repository.path)
                 || !job.secret_file.is_absolute()
                 || !job.restore_root.is_absolute()
                 || job.sources.iter().any(|p| !p.is_absolute())
@@ -246,7 +253,29 @@ impl Agent {
         if !job.allowed_operations.contains(&request.action.operation()) {
             return Err(ErrorCode::OperationDenied.into());
         }
-        if matches!(request.action, Action::Backup {}) {
+        if matches!(request.action, Action::Describe {}) {
+            return Ok(serde_json::json!({"repository": job.repository.path,
+                "sources": job.sources, "restore_root": job.restore_root,
+                "timeout_seconds": self.config.timeout_seconds}));
+        }
+        if let Action::BackupSelected {
+            expected_sources,
+            expected_repository,
+        } = &request.action
+        {
+            let actual: std::collections::BTreeSet<_> = job.sources.iter().collect();
+            let expected: std::collections::BTreeSet<_> = expected_sources.iter().collect();
+            if actual != expected
+                || expected.is_empty()
+                || expected_repository != &job.repository.path
+            {
+                return Err(ErrorCode::PlanChanged.into());
+            }
+        }
+        if matches!(
+            request.action,
+            Action::Backup {} | Action::BackupSelected { .. }
+        ) {
             let mut protected = Vec::new();
             for configured_job in &self.config.jobs {
                 if let Ok(path) = fs::canonicalize(&configured_job.secret_file) {
@@ -279,11 +308,12 @@ impl Agent {
         }
         let secret = RepositorySecret::new(job.repository.secret_reference, password.to_owned())?;
         let value = match request.action {
+            Action::Describe {} => unreachable!(),
             Action::Init {} => {
                 self.engine.init(&job.repository, &secret)?;
                 Ok(serde_json::json!({"initialized": true}))
             }
-            Action::Backup {} => {
+            Action::Backup {} | Action::BackupSelected { .. } => {
                 serde_json::to_value(self.engine.backup(&job.repository, &secret, &job.sources)?)
             }
             Action::Snapshots {} => {
@@ -438,6 +468,38 @@ mod tests {
             Outcome::Error { error } => error.code,
             _ => panic!("unexpected execution"),
         }
+    }
+
+    #[test]
+    fn desktop_plan_binding_rejects_unapproved_sources_and_destinations_before_secrets() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        let id = config.jobs[0].id;
+        let repository = config.jobs[0].repository.path.clone();
+        let sources = config.jobs[0].sources.clone();
+        config.jobs[0].allowed_operations = vec![Operation::Backup];
+        let agent = Agent::new(config).unwrap();
+        assert!(agent.handle(request(id, Action::Describe {})).is_success());
+        assert_eq!(
+            code(agent.handle(request(
+                id,
+                Action::BackupSelected {
+                    expected_sources: vec![directory.path().join("not-approved")],
+                    expected_repository: repository,
+                }
+            ))),
+            ErrorCode::PlanChanged
+        );
+        assert_eq!(
+            code(agent.handle(request(
+                id,
+                Action::BackupSelected {
+                    expected_sources: sources,
+                    expected_repository: directory.path().join("other-repository"),
+                }
+            ))),
+            ErrorCode::PlanChanged
+        );
     }
 
     #[test]

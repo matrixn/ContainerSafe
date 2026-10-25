@@ -199,6 +199,7 @@ fn activate(
     s.dirty = true;
     render(ui, &s);
     ui.set_active_server(format!("{} · {}", tested.server.name, tested.server.host).into());
+    crate::backup_ui::refresh_activity(ui, root, tested.server.id);
     set_status_message(
         ui,
         i18n::format(

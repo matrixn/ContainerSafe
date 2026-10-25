@@ -1,3 +1,7 @@
+# Actualizare 0.29
+
+Integrarea desktop pentru backupuri manuale de fișiere este disponibilă. Vezi [configurarea și limitele actuale](MANUAL_BACKUPS.md). Secțiunile de mai jos descriu fundația agentului 0.13.
+
 # ContainerSafe 0.13 — agent Linux
 
 Agentul rulează **o cerere JSON per proces**, pe stdin/stdout. Poate fi invocat local sau ca o comandă SSH după autentificarea și verificarea identității serverului. Nu ascultă pe un port, nu instalează servicii și nu execută comenzi shell din cerere. Operațiile sunt sincrone; după răspuns procesul se închide.

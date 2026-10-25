@@ -2,6 +2,13 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.29 — 2026-10-25
+
+- Connect Backup plans to the Linux stdio agent for manual encrypted file backups, snapshots, full data checks and isolated verified test restores. Keep raw database volumes blocked and reject unimplemented logical dumps explicitly.
+- Add an automatically saved default destination in Settings and per-plan overrides: server folder, this computer via SFTP, and remote SFTP / HTTPS S3. Require destination SSH host verification; keep repository passwords and backend credentials on the server.
+- Bind execution to the selected server UUID, fresh Docker source policies and the agent's exact approved source/repository configuration. Persist per-server activity and export reviewed setup files without secrets.
+- Add Windows SSH transport tests and real Linux Restic incremental backup/restore checks. Deployment and real remote backend verification remain separate setup steps; see docs/MANUAL_BACKUPS.md.
+
 ## 0.28 — 2026-10-25
 
 - Move Edit and Remove into colored, keyboard-accessible icon actions on each server row. Replace the default marker with a clickable gold star and separate the remaining footer buttons.

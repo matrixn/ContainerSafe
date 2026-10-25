@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.28** · Next releases increment by **0.01** (0.29, 0.30, …).
+**Version 0.29** · Next releases increment by **0.01** (0.30, 0.31, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -25,7 +25,7 @@ ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recov
 </div>
 
 > [!IMPORTANT]
-> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. The Restic backup/restore integration is currently a **local disposable-file laboratory**. Automated Docker backups, database-consistent production snapshots, and full-stack recovery are **not implemented or validated**. Keep using your established backup strategy.
+> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. Manual encrypted **file backups through the Linux agent** are available in Backup plans after server-side setup. Database-consistent snapshots, scheduling and full-stack recovery are **not implemented or validated**. See [manual backup setup](docs/MANUAL_BACKUPS.md). Keep using your established backup strategy.
 
 ## Why ContainerSafe?
 
@@ -79,7 +79,7 @@ Planned refactor:
 containersafe-core → containersafe-cli / containersafe-native / containersafe-agent
 ```
 
-The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. A dedicated Linux agent and production backup executor are future work.
+The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. The Linux agent supports manual file backup/restore through the desktop; production database orchestration remains future work.
 
 ## Getting started
 

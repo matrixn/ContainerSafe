@@ -1,3 +1,7 @@
+# Actualizare 0.29
+
+Motorul acceptă și destinații SFTP cu host checking strict și S3 HTTPS. Vezi [fluxul manual din desktop](MANUAL_BACKUPS.md). Documentația de mai jos descrie etapa inițială 0.12.
+
 # ContainerSafe 0.12 — motorul Restic
 
 Această pagină descrie etapa 0.12. Etapa 0.13 adaugă [agentul Linux](LINUX_AGENT.md); comenzile de laborator afișează versiunea curentă a aplicației.

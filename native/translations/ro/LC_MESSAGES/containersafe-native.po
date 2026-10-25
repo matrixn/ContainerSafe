@@ -4,6 +4,180 @@ msgstr ""
 "Language: ro\n"
 "Plural-Forms: nplurals=3; plural=(n == 1 ? 0 : (n == 0 || (n % 100 > 0 && n % 100 < 20)) ? 1 : 2);\n"
 
+msgid "Destination incomplete or invalid; not saved yet."
+msgstr "Destinația este incompletă sau invalidă; nu a fost salvată încă."
+
+msgid "Destination for this plan"
+msgstr "Destinația acestui plan"
+
+msgid "This destination applies only to this plan. Save the plan and update the agent configuration after changing it."
+msgstr "Această destinație se aplică doar acestui plan. Salvează planul și actualizează configurarea agentului după modificare."
+
+msgid "Open Backup plans to configure and run a manual file backup."
+msgstr "Deschide Planuri de backup pentru a configura și porni un backup manual de fișiere."
+
+msgid "Backup worker stopped unexpectedly. Inspect snapshots before retrying."
+msgstr "Operațiunea s-a întrerupt neașteptat. Verifică snapshoturile înainte să reîncerci."
+
+msgid "Default backup destination"
+msgstr "Destinația implicită pentru backup"
+
+msgid "New backup plans inherit this destination. Each plan can override it. Existing plans keep their destination."
+msgstr "Planurile noi preiau această destinație. O poți schimba pentru fiecare plan. Planurile existente își păstrează destinația."
+
+msgid "Folder on Docker server"
+msgstr "Dosar pe serverul Docker"
+
+msgid "This computer (SFTP)"
+msgstr "Acest calculator (SFTP)"
+
+msgid "Remote SFTP / S3"
+msgstr "Server extern SFTP / S3"
+
+msgid "The folder is on the Docker server, not on this PC. Use a dedicated backup disk or share."
+msgstr "Dosarul se află pe serverul Docker, nu pe acest PC. Folosește un disc sau o partajare dedicată backupurilor."
+
+msgid "The Docker server sends encrypted backups to this PC over SFTP. Enable an SSH/SFTP server on the PC, configure key authentication and pin its host key in the agent account's known_hosts."
+msgstr "Serverul Docker trimite backupurile criptate către acest PC prin SFTP. Activează un server SSH/SFTP pe PC, configurează autentificarea cu cheie și verifică cheia serverului în known_hosts al utilizatorului agentului."
+
+msgid "Use SFTP with a verified host key, or S3 over HTTPS. Configure S3 credentials in the agent account's protected AWS credentials file. Never put passwords in the URL."
+msgstr "Folosește SFTP cu identitatea serverului verificată sau S3 prin HTTPS. Configurează datele S3 în fișierul AWS protejat al utilizatorului agentului. Nu pune parole în adresă."
+
+msgid "Manual backup"
+msgstr "Backup manual"
+
+msgid "Only the approved files below will be saved. Database logical dumps are not available in this version. Do not include live database volumes."
+msgstr "Se salvează doar fișierele aprobate de mai jos. Exporturile logice ale bazelor de date nu sunt disponibile în această versiune. Nu include volumele bazelor de date active."
+
+msgid "Linux agent on the selected Docker server"
+msgstr "Agent Linux pe serverul Docker selectat"
+
+msgid "Agent executable"
+msgstr "Executabilul agentului"
+
+msgid "Agent config file"
+msgstr "Configurarea agentului"
+
+msgid "Job identifier"
+msgstr "Identificatorul jobului"
+
+msgid "Restic executable"
+msgstr "Executabilul Restic"
+
+msgid "Password file on server"
+msgstr "Fișierul parolei pe server"
+
+msgid "Isolated restore folder"
+msgstr "Dosar de restaurare izolat"
+
+msgid "First export the setup files, follow SETUP.md on the server, then initialize the repository once. Repository passwords stay on the server. The agent must be able to read the selected sources."
+msgstr "Exportă fișierele de configurare, urmează SETUP.md pe server, apoi inițializează depozitul o singură dată. Parolele depozitului rămân pe server. Agentul trebuie să poată citi sursele selectate."
+
+msgid "I accept a file-level backup; application consistency and full recovery are not guaranteed."
+msgstr "Accept un backup al fișierelor; consistența aplicației și recuperarea completă nu sunt garantate."
+
+msgid "Save plan"
+msgstr "Salvează planul"
+
+msgid "Export setup"
+msgstr "Exportă configurarea"
+
+msgid "Initialize repository"
+msgstr "Inițializează depozitul"
+
+msgid "Back up now"
+msgstr "Creează backup acum"
+
+msgid "List snapshots"
+msgstr "Listează snapshoturile"
+
+msgid "Check all data"
+msgstr "Verifică toate datele"
+
+msgid "Test restore"
+msgstr "Testează restaurarea"
+
+msgid "Backup…"
+msgstr "Backup…"
+
+msgid "Manual encrypted file backups via the Linux agent. Database dumps and scheduling are not available yet."
+msgstr "Backupuri manuale criptate ale fișierelor prin agentul Linux. Exporturile bazelor de date și programarea nu sunt disponibile încă."
+
+msgid "Backup activity"
+msgstr "Activitate backup"
+
+msgid "Agent paths must be absolute Linux paths"
+msgstr "Căile agentului trebuie să fie căi Linux absolute"
+
+msgid "Database dumps are not implemented yet. No backup was started. Choose a file-only plan or disable Logical dump explicitly."
+msgstr "Exporturile bazelor de date nu sunt implementate încă. Backupul nu a pornit. Alege un plan doar pentru fișiere sau dezactivează explicit Export logic."
+
+msgid "Inventory changed. Refresh and review your selections."
+msgstr "Inventarul s-a schimbat. Actualizează și verifică selecțiile."
+
+msgid "Live database volumes cannot be included in a file backup."
+msgstr "Volumele bazelor de date active nu pot fi incluse într-un backup de fișiere."
+
+msgid "Select at least one file source with Include."
+msgstr "Selectează cel puțin o sursă de fișiere cu Include."
+
+msgid "Could not load backup defaults. Original file preserved."
+msgstr "Nu s-au putut încărca destinațiile implicite. Fișierul original a fost păstrat."
+
+msgid "Configure the destination and export setup for the first run."
+msgstr "Configurează destinația și exportă configurarea pentru prima rulare."
+
+msgid "Connect a server first."
+msgstr "Conectează mai întâi un server."
+
+msgid "Server context changed. Reopen the backup plan."
+msgstr "Serverul activ s-a schimbat. Redeschide planul de backup."
+
+msgid "Backup plan saved."
+msgstr "Planul de backup a fost salvat."
+
+msgid "Setup exported. Follow SETUP.md on the Docker server before starting a backup."
+msgstr "Configurarea a fost exportată. Urmează SETUP.md pe serverul Docker înainte să pornești backupul."
+
+msgid "List snapshots and select one first."
+msgstr "Listează snapshoturile și selectează unul mai întâi."
+
+msgid "SSH host identity is unknown or changed. Connection blocked."
+msgstr "Identitatea serverului SSH este necunoscută sau s-a schimbat. Conexiunea a fost blocată."
+
+msgid "Agent configuration differs from this plan. Export and install the updated setup; nothing was started."
+msgstr "Configurarea agentului diferă de acest plan. Exportă și instalează configurarea actualizată; nu s-a pornit nicio operațiune."
+
+msgid "Snapshot {0}\n{1} files · {2} bytes processed · {3} seconds"
+msgstr "Snapshot {0}\n{1} fișiere · {2} octeți procesați · {3} secunde"
+
+msgid "Snapshots found: {0}"
+msgstr "Snapshoturi găsite: {0}"
+
+msgid "Encrypted repository initialized. You can start the first backup."
+msgstr "Depozitul criptat a fost inițializat. Poți porni primul backup."
+
+msgid "All repository data checked successfully."
+msgstr "Toate datele depozitului au fost verificate cu succes."
+
+msgid "Test restore verified at: {0}"
+msgstr "Restaurare de test verificată în: {0}"
+
+msgid "Checking sources and creating encrypted backup…"
+msgstr "Se verifică sursele și se creează backupul criptat…"
+
+msgid "Initializing encrypted repository…"
+msgstr "Se inițializează depozitul criptat…"
+
+msgid "Reading and checking all repository data…"
+msgstr "Se citesc și se verifică toate datele depozitului…"
+
+msgid "Restoring to a new isolated directory…"
+msgstr "Se restaurează într-un director izolat nou…"
+
+msgid "Loading snapshots…"
+msgstr "Se încarcă snapshoturile…"
+
 msgid "Settings"
 msgstr "Setări"
 

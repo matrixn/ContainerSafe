@@ -1,4 +1,5 @@
 import { SettingsPage, PreferenceEntry } from "settings-page.slint";
+import { BackupPanel, BackupDestinationSettings } from "backup-panel.slint";
 import { LoadingMotion } from "loading-motion.slint";
 import { SelectableText } from "selectable-text.slint";
 import { Theme, ActionButton as Button, ChoiceBox as ComboBox, InfoButton, ToggleCheck } from "theme.slint";
@@ -7,7 +8,7 @@ export { SplashWindow } from "splash.slint";
 import { ServerForm } from "dialogs/server-form.slint";
 import { ServerManager, ServerRow } from "dialogs/server-manager.slint";
 export { ServerRow } from "dialogs/server-manager.slint";
-import { ListView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
+import { ListView, ScrollView, AboutSlint, LineEdit, Palette } from "std-widgets.slint";
 export struct TreeEntry { key: string, name: string, note: string, depth: int, branch: bool, expanded: bool, selected: bool, app-index: int, container: string }
 export struct PlanEntry { name: string, kind: string, containers: int, selected: int, excluded: int, pending: int, app-index: int }
 export struct DataEntry { title: string, location: string, detail: string, decision: string, database: bool, caution: bool, options: [string], choice: int, row-index: int, has-method: bool, option-help: string, unavailable-help: string }
@@ -82,6 +83,29 @@ export component ContainerSafeWindow inherits Window {
     in-out property <bool> dirty: false;
     in-out property <bool> loading: false;
     in-out property <int> page: 0;
+    changed page => { if root.page == 2 { root.backup-action("activity"); } }
+    callback open-backup(int);
+    callback backup-action(string);
+    callback backup-default-edited;
+    in-out property <int> backup-default-kind;
+    in-out property <string> backup-default-location;
+    in-out property <string> backup-default-status;
+    in-out property <string> backup-title;
+    in-out property <string> backup-sources;
+    in-out property <int> backup-kind;
+    in-out property <string> backup-location;
+    in-out property <string> backup-executable;
+    in-out property <string> backup-config;
+    in-out property <string> backup-job;
+    in-out property <string> backup-restic;
+    in-out property <string> backup-password-file;
+    in-out property <string> backup-restore-root;
+    in-out property <bool> backup-acknowledged;
+    in-out property <string> backup-result;
+    in-out property <bool> backup-error;
+    in-out property <[string]> backup-snapshots;
+    in-out property <int> backup-snapshot-index;
+    in-out property <string> backup-activity;
 
     callback select-node(int, string);
     callback toggle-node(string);
@@ -186,7 +210,9 @@ export component ContainerSafeWindow inherits Window {
                 SelectableText { text: @tr("Make ContainerSafe yours"); font-size: 20px; font-weight: 700; text-color: Theme.ink; }
                 SelectableText { text: @tr("Appearance and startup apply here. Connection defaults apply only to new server profiles. Backup selections are saved separately."); text-color: Theme.muted; wrap: word-wrap; }
                 if root.settings-error != "" : SelectableText { selectable: true; text: root.settings-error; text-color: #a34431; wrap: word-wrap; }
-                SettingsPage { preferences: root.preferences; editable: root.settings-editable; changed(index, value) => { root.preference-changed(index, value); } }
+                SettingsPage { preferences: root.preferences; editable: root.settings-editable; changed(index, value) => { root.preference-changed(index, value); }
+                    backup-kind <=> root.backup-default-kind; backup-location <=> root.backup-default-location; backup-status: root.backup-default-status; backup-edited => { root.backup-default-edited(); }
+                }
             }
             if root.page == 0 : VerticalLayout {
                 padding: 22px; spacing: 18px;
@@ -263,7 +289,7 @@ export component ContainerSafeWindow inherits Window {
                                 }
                             }
                             if root.entries.length == 0 : SelectableText { height: 72px; text: root.active-index < 0 ? @tr("Choose a container or stack to review its storage.") : @tr("No persistent storage or database detected for this selection."); text-color: Theme.muted; wrap: word-wrap; }
-                            SelectableText { height: 24px; text: @tr("Selections prepare a backup plan. Production backup execution is not enabled."); text-color: #8996a6; font-size: 11px; overflow: elide; vertical-alignment: center; }
+                            SelectableText { height: 24px; text: @tr("Open Backup plans to configure and run a manual file backup."); text-color: #8996a6; font-size: 11px; overflow: elide; vertical-alignment: center; }
                         }
                     }
                 }
@@ -302,21 +328,23 @@ export component ContainerSafeWindow inherits Window {
                                         SelectableText { text: plan.excluded; width: 82px; text-color: Theme.muted; vertical-alignment: center; }
                                         SelectableText { text: plan.pending; width: 82px; text-color: plan.pending > 0 ? #976b20 : #39765c; font-weight: 600; vertical-alignment: center; }
                                         Button { width: 90px; text: @tr("Review"); clicked => { root.filter-text = ""; root.page = 0; root.select-node(plan.app-index, ""); } }
+                                        Button { text: @tr("Backup…"); enabled: !root.loading; primary: true; clicked => { root.open-backup(plan.app-index); } }
                                     }
                                     Rectangle { height: 1px; background: #e8edf3; }
                                 }
                             }
                         }
                         if root.plan-model.length == 0 : SelectableText { height: 70px; text: root.total-apps == 0 ? @tr("Connect a server and discover its containers first.") : @tr("No backups are enabled. Open Containers and select Include or Logical dump to create a plan."); text-color: Theme.muted; wrap: word-wrap; }
-                        SelectableText { text: @tr("Planning only · No scheduled or production backups have been created."); text-color: #8996a6; font-size: 11px; }
+                        SelectableText { text: @tr("Manual encrypted file backups via the Linux agent. Database dumps and scheduling are not available yet."); text-color: #8996a6; font-size: 11px; wrap: word-wrap; }
                     }
                 }
             }
             if root.page == 2 || root.page == 3 : Rectangle {
                 background: Theme.canvas; vertical-stretch: 1;
                 VerticalLayout { padding: 36px; spacing: 16px; alignment: start;
-                    SelectableText { text: root.page == 2 ? @tr("No backup activity yet") : "ContainerSafe " + root.app-version; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
-                    SelectableText { text: root.page == 2 ? @tr("Discover your containers, review storage and save your selections. Production scheduling is not enabled.") : @tr("Native Docker discovery and backup planning. Built with Rust + Slint."); wrap: word-wrap; text-color: Theme.muted; }
+                    SelectableText { text: root.page == 2 ? @tr("Backup activity") : "ContainerSafe " + root.app-version; text-color: Theme.ink; font-size: 24px; font-weight: 700; }
+                    if root.page == 2 : ScrollView { VerticalLayout { SelectableText { text: root.backup-activity; text-color: Theme.muted; wrap: word-wrap; } } }
+                    if root.page == 3 : SelectableText { text: @tr("Native Docker discovery and backup planning. Built with Rust + Slint."); wrap: word-wrap; text-color: Theme.muted; }
                     if root.page == 3 : AboutSlint { height: 80px; }
                 }
             }
@@ -333,6 +361,17 @@ export component ContainerSafeWindow inherits Window {
     if root.dialog != 0 : Rectangle {
         background: #0009;
         TouchArea {}
+        if root.dialog == 6 : BackupPanel {
+            x: (parent.width - self.width) / 2; y: 16px; width: min(980px, parent.width - 48px); height: parent.height - 32px;
+            title: root.backup-title; sources: root.backup-sources;
+            kind <=> root.backup-kind; location <=> root.backup-location;
+            executable <=> root.backup-executable; config <=> root.backup-config;
+            job <=> root.backup-job; restic <=> root.backup-restic;
+            password-file <=> root.backup-password-file; restore-root <=> root.backup-restore-root;
+            acknowledged <=> root.backup-acknowledged; snapshots <=> root.backup-snapshots; snapshot-index <=> root.backup-snapshot-index;
+            result: root.backup-result; error: root.backup-error;
+            action(value) => { root.backup-action(value); }
+        }
         if root.dialog == 1 : ServerForm {
             x: (parent.width - self.width) / 2; y: 12px;
             width: min(820px, parent.width - 48px); height: parent.height - 24px;

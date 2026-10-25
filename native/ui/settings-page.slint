@@ -2,6 +2,7 @@ import { SelectableText } from "selectable-text.slint";
 import { LoadingMotion } from "loading-motion.slint";
 import { Theme, ChoiceBox, ToggleCheck } from "theme.slint";
 import { ScrollView } from "std-widgets.slint";
+import { BackupDestinationSettings } from "backup-panel.slint";
 export struct PreferenceEntry { title: string, description: string, options: [string], choice: int, state: int }
 component PreferenceRow inherits Rectangle {
     in property <PreferenceEntry> item;
@@ -42,11 +43,16 @@ component PreferenceGroup inherits Rectangle {
     }
 }
 export component SettingsPage inherits Rectangle {
+    in-out property <int> backup-kind;
+    in-out property <string> backup-location;
+    in property <string> backup-status;
+    callback backup-edited;
     in property <[PreferenceEntry]> preferences;
     in property <bool> editable;
     callback changed(int, int);
     ScrollView {
         VerticalLayout { spacing: 18px;
+            BackupDestinationSettings { kind <=> root.backup-kind; location <=> root.backup-location; status: root.backup-status; edited => { root.backup-edited(); } }
             PreferenceGroup { title: @tr("Appearance & language"); description: @tr("Personalize the interface and connection animation."); indices: [0,7]; preferences: root.preferences; editable: root.editable; animation: true; changed(index, value) => { root.changed(index, value); } }
             PreferenceGroup { title: @tr("Startup & workspace"); description: @tr("Choose what opens and which sources are shown when you start."); indices: [1,2,6]; preferences: root.preferences; editable: root.editable; changed(index, value) => { root.changed(index, value); } }
             PreferenceGroup { title: @tr("New server defaults"); description: @tr("Starting values for new profiles. Existing servers keep their configuration."); indices: [3,4,5]; preferences: root.preferences; editable: root.editable; changed(index, value) => { root.changed(index, value); } }

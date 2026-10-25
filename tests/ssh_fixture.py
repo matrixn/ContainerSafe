@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import shlex
 from pathlib import Path
 import socket
 import sys
@@ -91,6 +92,28 @@ class Server(paramiko.ServerInterface):
     def check_channel_exec_request(self, channel, command):
         def execute():
             command_text = command.decode()
+            if command_text.startswith("'/fixture/agent"):
+                argv = shlex.split(command_text)
+                request_data = bytearray()
+                while True:
+                    part = channel.recv(8192)
+                    if not part:
+                        break
+                    request_data.extend(part)
+                    if len(request_data) > 65536:
+                        channel.close()
+                        return
+                request = json.loads(request_data)
+                assert argv == ["/fixture/agent 'literal; name", "--config", "/fixture/config 'literal; name"], argv
+                response = {"protocol_version": 1, "request_id": request["request_id"],
+                            "status": "ok", "result": {"repository": "/backup", "sources": ["/data"],
+                            "restore_root": "/restores", "timeout_seconds": 60}}
+                channel.send_stderr(b"private-fixture-marker\n")
+                channel.sendall(json.dumps(response).encode())
+                channel.send_exit_status(0)
+                channel.shutdown_write()
+                channel.close()
+                return
             username = channel.get_transport().get_username()
             synology_command = command_text.startswith("sudo -n /var/packages/ContainerManager/target/usr/bin/docker ")
             if "fixture-hang" in command_text:

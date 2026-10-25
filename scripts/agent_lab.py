@@ -67,11 +67,16 @@ def main():
         original, changed = b"ContainerSafe agent fixture\x00version 1\n", b"Changed agent fixture\x00version 2\n"
         fixture = source / "fixture.bin"
         fixture.write_bytes(original)
+        description = call({"operation": "describe"})
+        assert description["sources"] == [str(source)]
+        call({"operation": "backup_selected", "expected_sources": ["/not-approved"],
+              "expected_repository": str(root / "repository")}, error="plan_changed")
         call({"operation": "init"})
         assert call({"operation": "snapshots"}) == []
         first = call({"operation": "backup"})["snapshot_id"]
         fixture.write_bytes(changed)
-        second = call({"operation": "backup"})["snapshot_id"]
+        second = call({"operation": "backup_selected", "expected_sources": [str(source)],
+                       "expected_repository": str(root / "repository")})["snapshot_id"]
         assert first != second
         assert len(call({"operation": "snapshots"})) == 2
         assert call({"operation": "check", "read_data": True})["all_data_read"]

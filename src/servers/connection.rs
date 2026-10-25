@@ -145,6 +145,67 @@ pub fn verify_host(identity: &HostIdentity, pinned: Option<&str>) -> Result<(), 
 }
 
 impl Connection {
+    /// Invoke only the configured stdio agent. Credentials stay in SSH; the
+    /// request carries job IDs/approved source paths, never repository passwords.
+    pub fn agent(
+        &self,
+        executable: &str,
+        config: &str,
+        input: &[u8],
+        timeout_seconds: u64,
+    ) -> Result<Vec<u8>, String> {
+        fn quote(value: &str) -> Result<String, String> {
+            if !value.starts_with('/') || value.contains(['\0', '\r', '\n']) || value.len() > 4096 {
+                return Err("Agent and configuration paths must be absolute Linux paths".into());
+            }
+            Ok(format!("'{}'", value.replace('\'', "'\\''")))
+        }
+        if input.len() as u64 > crate::agent::MAX_REQUEST_BYTES
+            || !(1..=86400).contains(&timeout_seconds)
+        {
+            return Err("Invalid agent request size or timeout".into());
+        }
+        let command = format!("{} --config {}", quote(executable)?, quote(config)?);
+        self.runtime.block_on(async {
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_seconds);
+            let mut channel = tokio::time::timeout_at(deadline, self.session.channel_open_session()).await
+                .map_err(|_| "Agent: SSH channel timeout")?.map_err(|_| "Agent: SSH channel unavailable")?;
+            let operation = async {
+                channel.exec(true, command).await.map_err(|_| "Agent: execution failed")?;
+                channel.data(input).await.map_err(|_| "Agent: request transmission failed")?;
+                channel.eof().await.map_err(|_| "Agent: EOF failed")?;
+                let mut output = Vec::new();
+                let mut stderr_size = 0usize;
+                let mut status = None;
+                while let Some(message) = channel.wait().await {
+                    match message {
+                        ChannelMsg::Data { data } => {
+                            if output.len().saturating_add(data.len()) > 16 * 1024 * 1024 {
+                                return Err("Agent: output limit exceeded".to_string());
+                            }
+                            output.extend_from_slice(&data);
+                        }
+                        ChannelMsg::ExtendedData { data, .. } => {
+                            stderr_size = stderr_size.saturating_add(data.len());
+                            if stderr_size > 64 * 1024 { return Err("Agent: diagnostic limit exceeded".into()); }
+                        }
+                        ChannelMsg::ExitStatus { exit_status } => status = Some(exit_status),
+                        ChannelMsg::ExitSignal { .. } => return Err("Agent: process terminated".into()),
+                        _ => {}
+                    }
+                }
+                match status {
+                    Some(0 | 1) if !output.is_empty() => Ok(output),
+                    _ => Err("Agent unavailable: install the Linux agent and check executable/configuration permissions".into()),
+                }
+            };
+            let result = tokio::time::timeout_at(deadline, operation).await;
+            if !matches!(&result, Ok(Ok(_))) {
+                let _ = tokio::time::timeout(Duration::from_secs(1), channel.close()).await;
+            }
+            result.map_err(|_| "Agent timed out. Its server-side job may still be running; inspect snapshots before retrying".to_string())?
+        })
+    }
     pub fn open(
         server: &Server,
         secret: &Secret,

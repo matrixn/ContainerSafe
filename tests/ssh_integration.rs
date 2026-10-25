@@ -123,6 +123,18 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
             ConnectionStage::CheckingDocker
         ]
     );
+    let description = containersafe::backup::call(
+        &connection,
+        &containersafe::backup::AgentEndpoint {
+            executable: "/fixture/agent 'literal; name".into(),
+            config: "/fixture/config 'literal; name".into(),
+            job_id: uuid::Uuid::new_v4(),
+        },
+        containersafe::agent::Action::Describe {},
+        10,
+    )
+    .unwrap();
+    assert_eq!(description["sources"][0], "/data");
     assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
     f.server.username = "denied".into();
     let denied = Connection::open(&f.server, &password, &f.hosts)
