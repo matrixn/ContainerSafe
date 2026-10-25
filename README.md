@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.27** · Next releases increment by **0.01** (0.28, 0.29, …).
+**Version 0.28** · Next releases increment by **0.01** (0.29, 0.30, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -239,3 +239,5 @@ Choose **File → Settings → Loading animation** to preview and automatically 
 Desktop settings are grouped into three cards: Appearance & language, Startup & workspace, and New server defaults. Ordinary labels are nonselectable; error output remains selectable. Copy host in the server list copies the complete address including its SSH port. The splash is a centered, undecorated 550 × 353 window.
 
 Use **Help → Preview splash screen** to view the splash at any time. Press **Esc** to close the preview and return to the app; the preview does not run startup operations.
+
+Server rows include edit and delete icons and a clickable default star. The gold-starred profile is saved as the default and sorted first. Deletion still requires confirmation; changing the star does not change startup reconnection preferences.

@@ -24,28 +24,38 @@ struct Controller {
 }
 type Control = Arc<Mutex<Controller>>;
 
+// Sort only the displayed indices; actions continue to address the canonical profile.
+fn server_order(profiles: &Profiles) -> Vec<usize> {
+    let mut indices: Vec<_> = (0..profiles.servers.len()).collect();
+    indices.sort_by_key(|&index| profiles.default != Some(profiles.servers[index].id));
+    indices
+}
+
 fn rows(ui: &ContainerSafeWindow, c: &Controller) {
     ui.set_servers(ModelRc::new(VecModel::from(
-        c.profiles
-            .servers
-            .iter()
-            .map(|s| ServerRow {
-                name: s.name.clone().into(),
-                host: format!("{}:{}", s.host, s.port).into(),
-                status: if c.active.as_ref().is_some_and(|active| active.id == s.id) {
-                    i18n::text("Connected").into()
-                } else if s.last_status == "Connected" {
-                    i18n::text("Last success").into()
-                } else {
-                    i18n::text(&s.last_status).into()
-                },
-                last_opened: s
-                    .last_opened
-                    .and_then(|v| chrono::DateTime::from_timestamp(v as i64, 0))
-                    .map(|v| v.format("%Y-%m-%d %H:%M UTC").to_string())
-                    .unwrap_or_else(|| i18n::text("Never"))
-                    .into(),
-                default_server: c.profiles.default == Some(s.id),
+        server_order(&c.profiles)
+            .into_iter()
+            .map(|index| {
+                let s = &c.profiles.servers[index];
+                ServerRow {
+                    profile_index: index as i32,
+                    name: s.name.clone().into(),
+                    host: format!("{}:{}", s.host, s.port).into(),
+                    status: if c.active.as_ref().is_some_and(|active| active.id == s.id) {
+                        i18n::text("Connected").into()
+                    } else if s.last_status == "Connected" {
+                        i18n::text("Last success").into()
+                    } else {
+                        i18n::text(&s.last_status).into()
+                    },
+                    last_opened: s
+                        .last_opened
+                        .and_then(|v| chrono::DateTime::from_timestamp(v as i64, 0))
+                        .map(|v| v.format("%Y-%m-%d %H:%M UTC").to_string())
+                        .unwrap_or_else(|| i18n::text("Never"))
+                        .into(),
+                    default_server: c.profiles.default == Some(s.id),
+                }
             })
             .collect::<Vec<_>>(),
     )));
@@ -677,6 +687,26 @@ fn last_opened_server(profiles: &Profiles) -> Option<Server> {
 #[cfg(test)]
 mod startup_tests {
     use super::*;
+    #[test]
+    fn favorites_sort_first_without_changing_action_targets() {
+        let servers = vec![Server::default(), Server::default(), Server::default()];
+        let mut profiles = Profiles {
+            servers,
+            ..Profiles::default()
+        };
+        assert_eq!(server_order(&profiles), [0, 1, 2]);
+        profiles.set_default(profiles.servers[2].id).unwrap();
+        assert_eq!(server_order(&profiles), [2, 0, 1]);
+        let selected = server_order(&profiles)[0];
+        assert_eq!(profiles.servers[selected].id, profiles.default.unwrap());
+        let dir = tempfile::tempdir().unwrap();
+        profiles.save(dir.path()).unwrap();
+        let loaded = Profiles::load(dir.path()).unwrap();
+        assert_eq!(server_order(&loaded), [2, 0, 1]);
+        profiles.set_default(profiles.servers[1].id).unwrap();
+        assert_eq!(server_order(&profiles), [1, 0, 2]);
+        assert_eq!(profiles.servers[selected].id, loaded.default.unwrap());
+    }
     #[test]
     fn reconnect_uses_last_opened_instead_of_default_or_failed_attempt() {
         let older = Server {

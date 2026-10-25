@@ -347,7 +347,7 @@ export component ContainerSafeWindow inherits Window {
         }
         if root.dialog == 2 : ServerManager {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
-            width: 920px; height: 470px;
+            width: min(1040px, parent.width - 48px); height: 470px;
             servers: root.servers; selected <=> root.selected-server;
             action(action) => { root.server-action(action); }
         }

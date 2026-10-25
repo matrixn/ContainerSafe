@@ -2,6 +2,12 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.28 — 2026-10-25
+
+- Move Edit and Remove into colored, keyboard-accessible icon actions on each server row. Replace the default marker with a clickable gold star and separate the remaining footer buttons.
+- Persist the default profile and refresh the server list with the favorite first, keeping canonical profile indices so editing, removal and opening still target the correct UUID after sorting.
+- Add regression coverage for favorite ordering, persistence and action identity.
+
 ## 0.27 — 2026-10-25
 
 - Center the main desktop window on its monitor at its first native redraw, using actual outer dimensions and display scaling. Share the existing first-frame centering helper with the startup splash and Help preview.

@@ -19,7 +19,24 @@ component CopyHostButton inherits Rectangle {
     Tooltip { Text { text: root.copied ? @tr("Copied") : @tr("Copy host"); } }
     animate background { duration: 100ms; }
 }
-export struct ServerRow { name: string, host: string, status: string, last-opened: string, default-server: bool }
+component RowIconButton inherits Rectangle {
+    in property <image> icon;
+    in property <color> tint;
+    in property <string> label;
+    callback clicked;
+    width: 28px; height: 28px; border-radius: 6px;
+    background: touch.pressed ? #dae7ef : touch.has-hover ? #eaf2f8 : transparent;
+    border-width: focus.has-focus ? 1px : 0px; border-color: #4a8da6;
+    accessible-role: button; accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    forward-focus: focus;
+    focus := FocusScope { key-pressed(event) => { if event.text == Key.Return || event.text == " " { root.clicked(); return accept; } return reject; } }
+    Image { x: 5px; y: 5px; width: 18px; height: 18px; source: root.icon; colorize: root.tint; image-fit: contain; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.clicked(); } }
+    Tooltip { Text { text: root.label; } }
+    animate background { duration: 100ms; }
+}
+export struct ServerRow { profile-index: int, name: string, host: string, status: string, last-opened: string, default-server: bool }
 export component ServerManager inherits Rectangle {
     in property <[ServerRow]> servers;
     in-out property <int> selected: -1;
@@ -32,43 +49,50 @@ export component ServerManager inherits Rectangle {
         padding: 22px;
         spacing: 12px;
         SelectableText { text: @tr("Servers"); font-size: 22px; font-weight: 700; text-color: #192b42; }
-        HorizontalLayout {
-            SelectableText { text-color: #253b52; text: @tr("Name"); width: 190px; }
-            SelectableText { text-color: #253b52; text: @tr("Host"); width: 280px; }
-            SelectableText { text-color: #253b52; text: @tr("Status"); width: 120px; }
-            SelectableText { text-color: #253b52; text: @tr("Last opened"); }
+        HorizontalLayout { padding-left: 8px; padding-right: 8px; spacing: 12px;
+            SelectableText { text: @tr("Name"); width: 220px; }
+            SelectableText { text: @tr("Host"); width: 260px; }
+            SelectableText { text: @tr("Status"); width: 100px; }
+            SelectableText { text: @tr("Last opened"); horizontal-stretch: 1; }
+            SelectableText { text: @tr("Actions"); width: 76px; horizontal-alignment: center; }
         }
         ListView {
             for server[i] in root.servers: Rectangle {
-                height: 56px;
-                background: root.selected == i ? #e1f1f5 : (Math.mod(i,2) == 0 ? #f6f9fc : #ffffff);
+                height: 64px;
+                background: root.selected == server.profile-index ? #e1f1f5 : (Math.mod(i,2) == 0 ? #f6f9fc : #ffffff);
                 accessible-role: button; accessible-label: server.name + " " + server.host;
-                accessible-action-default => { root.selected = i; }
+                accessible-action-default => { root.selected = server.profile-index; }
                 forward-focus: row-focus;
                 row-focus := FocusScope { key-pressed(event) => {
-                    if event.text == Key.Return || event.text == " " { root.selected = i; return accept; }
+                    if event.text == Key.Return || event.text == " " { root.selected = server.profile-index; return accept; }
                     return reject;
                 } }
-                TouchArea { mouse-cursor: default; clicked => { row-focus.focus(); root.selected = i; } }
+                TouchArea { mouse-cursor: default; clicked => { row-focus.focus(); root.selected = server.profile-index; } }
                 HorizontalLayout {
-                    padding: 8px;
-                    SelectableText { width: 182px; text: (server.default-server ? "★ " : "") + server.name; vertical-alignment: center;  }
-                    HorizontalLayout { width: 280px; spacing: 8px;
+                    padding: 8px; spacing: 12px;
+                    HorizontalLayout { width: 220px; spacing: 8px;
+                        VerticalLayout { width: 28px; alignment: center;
+                            RowIconButton { icon: server.default-server ? @image-url("../../assets/icons/star-filled.svg") : @image-url("../../assets/icons/star.svg"); tint: server.default-server ? #d49a18 : #8b9bac; label: server.default-server ? @tr("Default server") : @tr("Set Default"); clicked => { root.selected = server.profile-index; root.action("default"); } }
+                        }
+                        SelectableText { text: server.name; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                    }
+                    HorizontalLayout { width: 260px; spacing: 8px;
                         SelectableText { text: server.host; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
                         VerticalLayout { width: 28px; alignment: center; CopyHostButton { copied: root.copied-host == i; clicked => { host-value.copy-all(); root.copied-host = i; } } }
                         host-value := SelectableText { visible: false; text: server.host; }
                     }
-                    SelectableText { text-color: #253b52; text: server.status; width: 120px; vertical-alignment: center; }
-                    SelectableText { text-color: #253b52; text: server.last-opened; vertical-alignment: center; }
+                    SelectableText { text-color: #253b52; text: server.status; width: 100px; vertical-alignment: center; overflow: elide; }
+                    SelectableText { text-color: #253b52; text: server.last-opened; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                    HorizontalLayout { width: 76px; spacing: 8px; alignment: center;
+                        VerticalLayout { width: 28px; alignment: center; RowIconButton { icon: @image-url("../../assets/icons/edit.svg"); tint: #287fa1; label: @tr("Edit"); clicked => { root.selected = server.profile-index; root.action("edit"); } } }
+                        VerticalLayout { width: 28px; alignment: center; RowIconButton { icon: @image-url("../../assets/icons/delete.svg"); tint: #c65b62; label: @tr("Remove"); clicked => { root.selected = server.profile-index; root.action("remove"); } } }
+                    }
                 }
             }
         }
-        SelectableText { text: @tr("★ = Default server. Opening a server preserves the default preference."); text-color: #62748a; }
-        HorizontalLayout {
+        SelectableText { text: @tr("The starred server is your default and appears first. Opening another server keeps this choice."); text-color: #62748a; }
+        HorizontalLayout { spacing: 12px;
             Button { text: @tr("New"); clicked => { root.action("new"); } }
-            Button { text: @tr("Edit"); enabled: root.selected >= 0; clicked => { root.action("edit"); } }
-            Button { text: @tr("Remove"); enabled: root.selected >= 0; clicked => { root.action("remove"); } }
-            Button { text: @tr("Set Default"); enabled: root.selected >= 0; clicked => { root.action("default"); } }
             Rectangle { horizontal-stretch: 1; }
             Button { text: @tr("Cancel"); clicked => { root.action("cancel"); } }
             Button { text: @tr("Open"); enabled: root.selected >= 0; clicked => { root.action("open"); } }

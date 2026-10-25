@@ -318,5 +318,8 @@
   "Discover containers. Review data. Plan your backups.": "Descoperă containerele. Verifică datele. Pregătește backupurile.",
   "Preview splash screen": "Previzualizare splashscreen",
   "Preview · Press Esc to close": "Previzualizare · Apasă Esc pentru închidere",
-  "Splash screen preview": "Previzualizare splashscreen"
+  "Splash screen preview": "Previzualizare splashscreen",
+  "Actions": "Acțiuni",
+  "Default server": "Server implicit",
+  "The starred server is your default and appears first. Opening another server keeps this choice.": "Serverul marcat cu stea este implicit și apare primul. Deschiderea altui server păstrează această alegere."
 }

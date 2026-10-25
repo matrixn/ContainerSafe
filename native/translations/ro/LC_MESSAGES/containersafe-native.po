@@ -964,3 +964,12 @@ msgstr "Previzualizare · Apasă Esc pentru închidere"
 msgid "Splash screen preview"
 msgstr "Previzualizare splashscreen"
 
+msgid "Actions"
+msgstr "Acțiuni"
+
+msgid "Default server"
+msgstr "Server implicit"
+
+msgid "The starred server is your default and appears first. Opening another server keeps this choice."
+msgstr "Serverul marcat cu stea este implicit și apare primul. Deschiderea altui server păstrează această alegere."
+
