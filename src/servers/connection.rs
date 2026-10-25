@@ -166,14 +166,45 @@ impl Connection {
             return Err("Invalid agent request size or timeout".into());
         }
         let command = format!("{} --config {}", quote(executable)?, quote(config)?);
+        self.input_command(command, input, timeout_seconds, true)
+    }
+
+    pub(crate) fn restic_script(
+        &self,
+        script: &str,
+        arguments: &[String],
+        timeout_seconds: u64,
+    ) -> Result<Vec<u8>, String> {
+        if script.len() > 64 * 1024
+            || !(1..=86400).contains(&timeout_seconds)
+            || arguments
+                .iter()
+                .any(|arg| arg.contains(['\0', '\r', '\n']) || arg.len() > 4096)
+        {
+            return Err("Invalid remote Restic request".into());
+        }
+        let mut command = String::from("sh -s --");
+        for argument in arguments {
+            command.push_str(&format!(" '{}'", argument.replace('\'', "'\\''")));
+        }
+        self.input_command(command, script.as_bytes(), timeout_seconds, false)
+    }
+
+    fn input_command(
+        &self,
+        command: String,
+        input: &[u8],
+        timeout_seconds: u64,
+        agent: bool,
+    ) -> Result<Vec<u8>, String> {
         self.runtime.block_on(async {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_seconds);
             let mut channel = tokio::time::timeout_at(deadline, self.session.channel_open_session()).await
-                .map_err(|_| "Agent: SSH channel timeout")?.map_err(|_| "Agent: SSH channel unavailable")?;
+                .map_err(|_| "SSH: SSH channel timeout")?.map_err(|_| "SSH: SSH channel unavailable")?;
             let operation = async {
-                channel.exec(true, command).await.map_err(|_| "Agent: execution failed")?;
-                channel.data(input).await.map_err(|_| "Agent: request transmission failed")?;
-                channel.eof().await.map_err(|_| "Agent: EOF failed")?;
+                channel.exec(true, command).await.map_err(|_| "SSH: execution failed")?;
+                channel.data(input).await.map_err(|_| "SSH: request transmission failed")?;
+                channel.eof().await.map_err(|_| "SSH: EOF failed")?;
                 let mut output = Vec::new();
                 let mut stderr_size = 0usize;
                 let mut status = None;
@@ -181,29 +212,45 @@ impl Connection {
                     match message {
                         ChannelMsg::Data { data } => {
                             if output.len().saturating_add(data.len()) > 16 * 1024 * 1024 {
-                                return Err("Agent: output limit exceeded".to_string());
+                                return Err("SSH: output limit exceeded".to_string());
                             }
                             output.extend_from_slice(&data);
                         }
                         ChannelMsg::ExtendedData { data, .. } => {
                             stderr_size = stderr_size.saturating_add(data.len());
-                            if stderr_size > 64 * 1024 { return Err("Agent: diagnostic limit exceeded".into()); }
+                            if stderr_size > 64 * 1024 { return Err("SSH: diagnostic limit exceeded".into()); }
                         }
                         ChannelMsg::ExitStatus { exit_status } => status = Some(exit_status),
-                        ChannelMsg::ExitSignal { .. } => return Err("Agent: process terminated".into()),
+                        ChannelMsg::ExitSignal { .. } => return Err("SSH: process terminated".into()),
                         _ => {}
                     }
                 }
                 match status {
-                    Some(0 | 1) if !output.is_empty() => Ok(output),
-                    _ => Err("Agent unavailable: install the Linux agent and check executable/configuration permissions".into()),
+                    Some(0) => Ok(output),
+                    Some(1) if agent && !output.is_empty() => Ok(output),
+                    _ if agent => Err("Agent unavailable: install the Linux agent and check executable/configuration permissions".into()),
+                    Some(code) => Err(match code {
+                        3 => "Restic: incomplete backup; some files were not readable. Snapshot is not a complete backup",
+                        10 => "Restic: repository missing; initialize it first",
+                        11 => "Restic: repository locked by another operation",
+                        12 => "Restic: incorrect repository password",
+                        70 => "Restic executable missing. Install Restic on the NAS or specify its absolute path",
+                        71 => "Password file must be a non-symlink regular file, owned by the SSH user or root, with mode 600 or 400",
+                        72 => "Unsafe or unreadable source, or overlap with repository/password file",
+                        73 => "Unsafe restore directory: choose a separate existing folder outside sources and repository",
+                        74 => "Repository already contains files; do not initialize it again",
+                        75 => "Remote path unavailable or access denied. DSM administrator/Docker sudo access does not automatically grant file permissions",
+                        76 => "Required NAS utilities unavailable: sh, stat, readlink and id are required",
+                        _ => "Restic failed. Check repository access, source permissions and destination credentials on the NAS",
+                    }.to_string()),
+                    None => Err("SSH: remote command ended without an exit status".into()),
                 }
             };
             let result = tokio::time::timeout_at(deadline, operation).await;
             if !matches!(&result, Ok(Ok(_))) {
                 let _ = tokio::time::timeout(Duration::from_secs(1), channel.close()).await;
             }
-            result.map_err(|_| "Agent timed out. Its server-side job may still be running; inspect snapshots before retrying".to_string())?
+            result.map_err(|_| "SSH operation timed out. The remote process may still be running; inspect snapshots before retrying".to_string())?
         })
     }
     pub fn open(

@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.29** · Next releases increment by **0.01** (0.30, 0.31, …).
+**Version 0.30** · Next releases increment by **0.01** (0.31, 0.32, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -25,7 +25,7 @@ ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recov
 </div>
 
 > [!IMPORTANT]
-> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. Manual encrypted **file backups through the Linux agent** are available in Backup plans after server-side setup. Database-consistent snapshots, scheduling and full-stack recovery are **not implemented or validated**. See [manual backup setup](docs/MANUAL_BACKUPS.md). Keep using your established backup strategy.
+> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. Manual encrypted **file backups directly over SSH** are available in Backup plans after installing Restic on the server. The ContainerSafe agent is optional. Database-consistent snapshots, scheduling and full-stack recovery are **not implemented or validated**. See [manual backup setup](docs/MANUAL_BACKUPS.md). Keep using your established backup strategy.
 
 ## Why ContainerSafe?
 
@@ -79,7 +79,7 @@ Planned refactor:
 containersafe-core → containersafe-cli / containersafe-native / containersafe-agent
 ```
 
-The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. The Linux agent supports manual file backup/restore through the desktop; production database orchestration remains future work.
+The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. Direct Restic-over-SSH and the optional Linux agent support manual file backup/restore through the desktop; production database orchestration remains future work.
 
 ## Getting started
 
@@ -170,10 +170,12 @@ The Linux `containersafe-agent` binary now exposes versioned JSON requests over 
 - [x] Shared Rust core for CLI and desktop, explicit server UUIDs and isolated local data
 - [x] Server manager, pinned SSH identities, OS credentials and default-server startup
 - [ ] Robust cross-platform CLI, configuration and error handling
-- [ ] Desktop-to-agent transport and Docker/database orchestration with least-privilege considerations
+- [x] Manual file backup/restore over pinned SSH, with optional desktop-to-agent transport
+- [ ] Docker/database orchestration with least-privilege considerations
 - [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies
 - [ ] PostgreSQL-consistent backup adapter and disposable integration tests
-- [ ] Restic destination management, scheduling and retention
+- [x] Default backup destinations and per-plan overrides (server folder, SFTP, HTTPS S3)
+- [ ] Backup scheduling and retention
 - [ ] Isolated application restore verification
 - [ ] Linux/macOS desktop testing and packaged releases
 

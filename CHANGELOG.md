@@ -2,6 +2,13 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.30 — 2026-10-25
+
+- Make direct Restic-over-SSH the default backup executor; no ContainerSafe agent or agent.json is required. Keep the agent as an explicit advanced option and migrate existing plans to the direct default without discarding paths.
+- Adapt each plan's form to its execution mode and destination: hide agent executable/config/job fields for direct SSH and show destination-specific labels/help. Export matching setup instructions instead of an unnecessary agent configuration.
+- Support DSM 7.4 with POSIX/BusyBox-compatible preflight commands, private server-side password files, safe path quoting, canonical source/repository overlap checks and isolated verified restores after source loss. Never inherit Docker sudo permissions for Restic or weaken SSH/SFTP host verification.
+- Verify DSM 7.4 x64 and required NAS utilities read-only. Validate direct script backup/restore with real Restic in isolated Linux storage and pinned SSH transport through the loopback fixture; no production NAS backups are executed.
+
 ## 0.29 — 2026-10-25
 
 - Connect Backup plans to the Linux stdio agent for manual encrypted file backups, snapshots, full data checks and isolated verified test restores. Keep raw database volumes blocked and reject unimplemented logical dumps explicitly.

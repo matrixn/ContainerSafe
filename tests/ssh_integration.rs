@@ -135,6 +135,38 @@ fn real_password_key_authentication_host_identity_and_docker_checks() {
     )
     .unwrap();
     assert_eq!(description["sources"][0], "/data");
+    let snapshots = containersafe::direct_backup::execute(
+        &connection,
+        "/fixture/restic 'literal; name",
+        "/fixture/password",
+        "/fixture/restores",
+        &containersafe::backup::Destination {
+            kind: containersafe::backup::DestinationKind::ServerFolder,
+            location: "/fixture/repository".into(),
+        },
+        &[],
+        containersafe::agent::Action::Snapshots {},
+    )
+    .unwrap();
+    assert_eq!(snapshots, serde_json::json!([]));
+    let error = containersafe::direct_backup::execute(
+        &connection,
+        "/fixture/restic-incomplete",
+        "/fixture/password",
+        "/fixture/restores",
+        &containersafe::backup::Destination {
+            kind: containersafe::backup::DestinationKind::ServerFolder,
+            location: "/fixture/repository".into(),
+        },
+        &[std::path::PathBuf::from("/fixture/data")],
+        containersafe::agent::Action::BackupSelected {
+            expected_sources: vec![std::path::PathBuf::from("/fixture/data")],
+            expected_repository: "/fixture/repository".into(),
+        },
+    )
+    .unwrap_err();
+    assert!(error.contains("incomplete backup"));
+    assert!(!error.contains("private-fixture-marker"));
     assert_eq!(containersafe::discover(&connection).unwrap().len(), 1);
     f.server.username = "denied".into();
     let denied = Connection::open(&f.server, &password, &f.hosts)

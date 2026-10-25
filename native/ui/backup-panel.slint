@@ -4,6 +4,7 @@ import { LineEdit, ScrollView } from "std-widgets.slint";
 
 export component BackupDestinationSettings inherits Rectangle {
     in property <bool> default-mode: true;
+    in property <bool> agent-mode: false;
     in-out property <int> kind;
     in-out property <string> location;
     in property <string> status;
@@ -11,17 +12,19 @@ export component BackupDestinationSettings inherits Rectangle {
     min-height: root.default-mode ? 220px : 180px; vertical-stretch: 0; background: white; border-radius: 12px; border-width: 1px; border-color: Theme.line;
     VerticalLayout { padding: 20px; spacing: 10px; alignment: start;
         Text { text: root.default-mode ? @tr("Default backup destination") : @tr("Destination for this plan"); color: Theme.ink; font-size: 17px; font-weight: 700; }
-        SelectableText { text: root.default-mode ? @tr("New backup plans inherit this destination. Each plan can override it. Existing plans keep their destination.") : @tr("This destination applies only to this plan. Save the plan and update the agent configuration after changing it."); text-color: Theme.muted; wrap: word-wrap; }
+        SelectableText { text: root.default-mode ? @tr("New backup plans inherit this destination. Each plan can override it. Existing plans keep their destination.") : root.agent-mode ? @tr("This destination applies only to this plan. Save the plan and update the agent configuration after changing it.") : @tr("This destination applies only to this plan. Save your changes before starting the backup."); text-color: Theme.muted; wrap: word-wrap; }
+        Text { text: root.kind == 0 ? @tr("Absolute folder on the NAS / Docker server") : root.kind == 1 ? @tr("SFTP address of this computer") : @tr("Remote repository address: SFTP or HTTPS S3"); color: Theme.muted; font-size: 12px; }
         HorizontalLayout { spacing: 14px;
             ChoiceBox { width: 260px; model: [@tr("Folder on Docker server"), @tr("This computer (SFTP)"), @tr("Remote SFTP / S3")]; current-index <=> root.kind; selected(value) => { root.edited(); } }
             LineEdit { text <=> root.location; placeholder-text: root.kind == 0 ? "/volume1/ContainerSafe/backups" : root.kind == 1 ? "sftp:backup-pc:/C:/ContainerSafe" : "s3:https://endpoint/bucket/containersafe"; edited => { root.edited(); } }
         }
-        SelectableText { text: root.kind == 0 ? @tr("The folder is on the Docker server, not on this PC. Use a dedicated backup disk or share.") : root.kind == 1 ? @tr("The Docker server sends encrypted backups to this PC over SFTP. Enable an SSH/SFTP server on the PC, configure key authentication and pin its host key in the agent account's known_hosts.") : @tr("Use SFTP with a verified host key, or S3 over HTTPS. Configure S3 credentials in the agent account's protected AWS credentials file. Never put passwords in the URL."); text-color: Theme.muted; wrap: word-wrap; }
+        SelectableText { text: root.kind == 0 ? @tr("The folder is on the Docker server, not on this PC. Use a dedicated backup disk or share.") : root.kind == 1 ? @tr("The Docker server sends encrypted backups to this PC over SFTP. Enable an SSH/SFTP server on the PC, configure key authentication and pin its host key in the SSH account's known_hosts.") : @tr("Use SFTP with a verified host key, or S3 over HTTPS. Configure S3 credentials in the SSH account's protected AWS credentials file. Never put passwords in the URL."); text-color: Theme.muted; wrap: word-wrap; }
         SelectableText { text: root.status; text-color: Theme.accent; wrap: word-wrap; }
     }
 }
 
 export component BackupPanel inherits Rectangle {
+    in-out property <bool> use-agent: false;
     in property <string> title;
     in property <string> sources;
     in-out property <int> kind;
@@ -45,17 +48,18 @@ export component BackupPanel inherits Rectangle {
             VerticalLayout { spacing: 12px;
                 SelectableText { text: @tr("Only the approved files below will be saved. Database logical dumps are not available in this version. Do not include live database volumes."); text-color: #976b20; wrap: word-wrap; }
                 SelectableText { text: root.sources; text-color: Theme.muted; wrap: word-wrap; }
-                BackupDestinationSettings { default-mode: false; kind <=> root.kind; location <=> root.location; }
-                Text { text: @tr("Linux agent on the selected Docker server"); color: Theme.ink; font-size: 15px; font-weight: 650; }
-                HorizontalLayout { spacing: 12px;
+                BackupDestinationSettings { default-mode: false; agent-mode: root.use-agent; kind <=> root.kind; location <=> root.location; }
+                Text { text: @tr("Backup execution"); color: Theme.ink; font-size: 15px; font-weight: 650; }
+                ChoiceBox { model: [@tr("Restic directly over SSH (recommended)"), @tr("ContainerSafe Linux agent (advanced)")]; current-index: root.use-agent ? 1 : 0; selected(value) => { root.use-agent = self.current-index == 1; } }
+                if root.use-agent : HorizontalLayout { spacing: 12px;
                     Text { width: 150px; text: @tr("Agent executable"); color: Theme.muted; vertical-alignment: center; }
                     LineEdit { text <=> root.executable; }
                 }
-                HorizontalLayout { spacing: 12px;
+                if root.use-agent : HorizontalLayout { spacing: 12px;
                     Text { width: 150px; text: @tr("Agent config file"); color: Theme.muted; vertical-alignment: center; }
                     LineEdit { text <=> root.config; }
                 }
-                HorizontalLayout { spacing: 12px;
+                if root.use-agent : HorizontalLayout { spacing: 12px;
                     Text { width: 150px; text: @tr("Job identifier"); color: Theme.muted; vertical-alignment: center; }
                     LineEdit { text <=> root.job; read-only: true; }
                 }
@@ -71,7 +75,7 @@ export component BackupPanel inherits Rectangle {
                     Text { width: 150px; text: @tr("Isolated restore folder"); color: Theme.muted; vertical-alignment: center; }
                     LineEdit { text <=> root.restore-root; }
                 }
-                SelectableText { text: @tr("First export the setup files, follow SETUP.md on the server, then initialize the repository once. Repository passwords stay on the server. The agent must be able to read the selected sources."); text-color: Theme.muted; wrap: word-wrap; }
+                SelectableText { text: root.use-agent ? @tr("First export the setup files, follow SETUP.md on the server, then initialize the repository once. Repository passwords stay on the server. The agent must be able to read the selected sources.") : @tr("No ContainerSafe agent is required. Install Restic on the NAS, create a password file with mode 600 and a separate restore folder. On DSM, Docker sudo access does not grant Restic access to files. Backup uses your SSH account without automatic sudo."); text-color: Theme.muted; wrap: word-wrap; }
                 HorizontalLayout { spacing: 10px;
                     ActionButton { text: @tr("Initialize repository"); enabled: root.acknowledged; clicked => { root.action("init"); } }
                 }

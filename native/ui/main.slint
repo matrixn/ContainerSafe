@@ -90,6 +90,7 @@ export component ContainerSafeWindow inherits Window {
     in-out property <int> backup-default-kind;
     in-out property <string> backup-default-location;
     in-out property <string> backup-default-status;
+    in-out property <bool> backup-use-agent: false;
     in-out property <string> backup-title;
     in-out property <string> backup-sources;
     in-out property <int> backup-kind;
@@ -335,7 +336,7 @@ export component ContainerSafeWindow inherits Window {
                             }
                         }
                         if root.plan-model.length == 0 : SelectableText { height: 70px; text: root.total-apps == 0 ? @tr("Connect a server and discover its containers first.") : @tr("No backups are enabled. Open Containers and select Include or Logical dump to create a plan."); text-color: Theme.muted; wrap: word-wrap; }
-                        SelectableText { text: @tr("Manual encrypted file backups via the Linux agent. Database dumps and scheduling are not available yet."); text-color: #8996a6; font-size: 11px; wrap: word-wrap; }
+                        SelectableText { text: @tr("Manual encrypted file backups over SSH. Database dumps and scheduling are not available yet."); text-color: #8996a6; font-size: 11px; wrap: word-wrap; }
                     }
                 }
             }
@@ -363,7 +364,7 @@ export component ContainerSafeWindow inherits Window {
         TouchArea {}
         if root.dialog == 6 : BackupPanel {
             x: (parent.width - self.width) / 2; y: 16px; width: min(980px, parent.width - 48px); height: parent.height - 32px;
-            title: root.backup-title; sources: root.backup-sources;
+            title: root.backup-title; sources: root.backup-sources; use-agent <=> root.backup-use-agent;
             kind <=> root.backup-kind; location <=> root.backup-location;
             executable <=> root.backup-executable; config <=> root.backup-config;
             job <=> root.backup-job; restic <=> root.backup-restic;

@@ -12,6 +12,8 @@ use uuid::Uuid;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PlanConfig {
+    #[serde(default)]
+    use_agent: bool,
     destination: Destination,
     endpoint: AgentEndpoint,
     restic: String,
@@ -27,6 +29,7 @@ impl PlanConfig {
             endpoint.job_id
         );
         Self {
+            use_agent: false,
             destination,
             password_file: format!(
                 "/home/backup/.config/containersafe/{}.password",
@@ -40,15 +43,13 @@ impl PlanConfig {
     }
     fn validate(&self) -> Result<(), String> {
         self.destination.validate()?;
-        for path in [
-            &self.endpoint.executable,
-            &self.endpoint.config,
-            &self.restic,
-            &self.password_file,
-            &self.restore_root,
-        ] {
+        let mut paths = vec![&self.restic, &self.password_file, &self.restore_root];
+        if self.use_agent {
+            paths.extend([&self.endpoint.executable, &self.endpoint.config]);
+        }
+        for path in paths {
             if !path.starts_with('/') || path.len() > 4096 || path.contains(['\0', '\r', '\n']) {
-                return Err(i18n::text("Agent paths must be absolute Linux paths"));
+                return Err(i18n::text("Backup paths must be absolute Linux paths"));
             }
         }
         if self.endpoint.job_id.is_nil() || self.secret_reference.is_nil() {
@@ -144,6 +145,7 @@ struct OpenPlan {
 }
 fn read_form(ui: &ContainerSafeWindow, previous: &PlanConfig) -> Result<PlanConfig, String> {
     let mut value = previous.clone();
+    value.use_agent = ui.get_backup_use_agent();
     value.destination = Destination {
         kind: kind(ui.get_backup_kind()),
         location: ui.get_backup_location().trim().into(),
@@ -161,6 +163,57 @@ fn plan_path(root: &Path, id: Uuid) -> PathBuf {
 }
 
 fn export_setup(config: &PlanConfig, sources: &[PathBuf], directory: &Path) -> Result<(), String> {
+    if !config.use_agent {
+        let folder = directory.join(format!("containersafe-ssh-setup-{}", Uuid::new_v4()));
+        fs::create_dir(&folder).map_err(|e| e.to_string())?;
+        save(
+            &folder.join("backup-plan.json"),
+            &serde_json::json!({"transport":"restic-over-ssh",
+            "restic":config.restic,"password_file":config.password_file,"restore_root":config.restore_root,
+            "destination":config.destination,"approved_sources":sources}),
+        )?;
+        fs::write(
+            folder.join("SETUP.md"),
+            format!(
+                r#"# Restic directly over SSH — Synology DSM 7.4
+
+No ContainerSafe agent, service or agent.json is required.
+
+1. Install a Linux Restic executable matching your NAS CPU at `{restic}`.
+   Use Restic 0.19.1 or a compatible version. Confirm executable permission and `restic version`.
+2. Under the SAME SSH account used by ContainerSafe, create a private directory
+   for `{password}` (parent mode 700). Create a strong repository password in that
+   file (one line, mode 600, regular file, not a symlink). Keep a separate secure copy.
+   Do not put the password in shell command arguments, this plan, or source control.
+3. Create `{restores}` outside source folders and repository, writable by the SSH user.
+   DSM homes commonly live under /var/services/homes/<username>; home service must
+   be enabled to use that location. Choose a dedicated writable share if it is disabled.
+4. Destination: `{destination}`. For a local NAS repository, its parent must exist
+   and be writable. No recursive chmod/chown or sudo policy changes are performed.
+5. Check the approved sources in backup-plan.json. The SSH account must be able
+   to read the files. Being a DSM administrator or having sudo -n docker access
+   does NOT automatically grant Restic read/write access. Direct mode does not use sudo.
+6. In ContainerSafe save the plan, initialize the repository ONCE, back up,
+   list snapshots, check all data and test an isolated restore.
+
+For SFTP (including backup to this PC), enable an SSH/SFTP server at the destination,
+authorize a dedicated key for the NAS SSH user, and independently verify/pin its host
+key in that account's known_hosts. Use ~/.ssh/config aliases for ports/key paths.
+For S3 HTTPS, configure the NAS SSH user's protected ~/.aws/credentials (mode 600).
+Never disable host identity or TLS verification. Credentials are not stored in this export.
+
+Only approved files are backed up. Logical database dumps and full application
+consistency are not provided. No running container is stopped or modified.
+"#,
+                restic = config.restic,
+                password = config.password_file,
+                restores = config.restore_root,
+                destination = config.destination.location
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     let agent = AgentConfig {
         restic_executable: config.restic.clone().into(),
         timeout_seconds: 3600,
@@ -375,8 +428,16 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                         Uuid::new_v4()
                     );
                 }
-                PlanConfig::new(destination)
+                let mut config = PlanConfig::new(destination);
+                let home = format!("/var/services/homes/{}", server.username);
+                config.password_file = format!(
+                    "{home}/.config/containersafe/{}.password",
+                    config.endpoint.job_id
+                );
+                config.restore_root = format!("{home}/containersafe-restores");
+                config
             });
+            ui.set_backup_use_agent(config.use_agent);
             ui.set_backup_title(app.application.clone().into());
             ui.set_backup_sources(
                 sources
@@ -487,6 +548,11 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                     let app = current.applications.iter().find(|app| app.application == plan.application).ok_or_else(|| i18n::text("Inventory changed. Refresh and review your selections."))?;
                     if approved_sources(app, &selection)? != sources { return Err(i18n::text("Inventory changed. Refresh and review your selections.")); }
                 }
+                if !plan.config.use_agent {
+                    return containersafe::direct_backup::execute(&connection, &plan.config.restic,
+                        &plan.config.password_file, &plan.config.restore_root,
+                        &plan.config.destination, &sources, action);
+                }
                 let description: JobDescription = serde_json::from_value(backup::call(&connection, &plan.config.endpoint, Action::Describe {}, 30)?).map_err(|_| "Invalid agent job description")?;
                 let expected: BTreeSet<_> = sources.iter().collect(); let actual: BTreeSet<_> = description.sources.iter().collect();
                 if actual != expected || description.repository != Path::new(&plan.config.destination.location)
@@ -563,6 +629,35 @@ fn valid_snapshot(value: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn direct_mode_is_default_migrates_old_plans_and_exports_no_agent_config() {
+        let root = tempfile::tempdir().unwrap();
+        let mut config = PlanConfig::new(Destination {
+            kind: DestinationKind::ServerFolder,
+            location: "/backups/demo".into(),
+        });
+        assert!(!config.use_agent);
+        let mut legacy = serde_json::to_value(&config).unwrap();
+        legacy.as_object_mut().unwrap().remove("use_agent");
+        assert!(
+            !serde_json::from_value::<PlanConfig>(legacy)
+                .unwrap()
+                .use_agent
+        );
+        config.endpoint.executable = "not needed".into();
+        config.endpoint.config = "not needed".into();
+        assert!(config.validate().is_ok());
+        export_setup(&config, &[PathBuf::from("/srv/demo")], root.path()).unwrap();
+        let folder = fs::read_dir(root.path())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert!(folder.join("SETUP.md").is_file());
+        assert!(folder.join("backup-plan.json").is_file());
+        assert!(!folder.join("agent.json").exists());
+    }
+    #[test]
     fn default_destination_and_plan_overrides_remain_separate_per_server() {
         let root = tempfile::tempdir().unwrap();
         let default_path = root.path().join("backup-default.json");
@@ -596,10 +691,11 @@ mod tests {
     #[test]
     fn exported_setup_contains_only_approved_sources_and_secret_references() {
         let root = tempfile::tempdir().unwrap();
-        let config = PlanConfig::new(Destination {
+        let mut config = PlanConfig::new(Destination {
             kind: DestinationKind::ServerFolder,
             location: "/backups/demo".into(),
         });
+        config.use_agent = true;
         export_setup(&config, &[PathBuf::from("/srv/demo")], root.path()).unwrap();
         let folders = fs::read_dir(root.path())
             .unwrap()

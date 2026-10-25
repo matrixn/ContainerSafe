@@ -1,4 +1,55 @@
-# ContainerSafe 0.29 — backupuri manuale de fișiere
+# ContainerSafe 0.30 — backupuri manuale de fișiere
+
+## Mod implicit: Restic direct prin SSH, fără agent
+
+În **Backup plans → Backup… → Backup execution**, alege **Restic directly over SSH**.
+Acesta este modul implicit inclusiv pentru planurile salvate înainte de 0.30. Câmpurile
+agentului dispar; căile și destinațiile deja salvate sunt păstrate pentru verificare.
+Pentru modul **ContainerSafe Linux agent (advanced)** apar din nou numai câmpurile
+specifice agentului. Destinația afișează eticheta și explicațiile pentru dosar pe NAS,
+PC prin SFTP sau storage extern SFTP/S3, în funcție de selecție.
+
+Pentru DSM 7.4:
+
+1. Instalează **Restic**, nu agentul ContainerSafe, într-o cale Linux executabilă
+   pe NAS. Poți folosi un director al utilizatorului, de exemplu
+   `/var/services/homes/matrixn/bin/restic`, fără instalare în directoarele sistemului.
+   Completează aceeași cale la **Restic executable**. Verifică arhitectura NAS-ului;
+   binarul Linux x64 din `target/linux-agent/restic` este copia locală folosită în teste.
+2. Creează un fișier cu parola repository-ului pe NAS, deținut de utilizatorul SSH,
+   cu permisiuni `600` sau `400`, fără symlink. Directorul părinte ar trebui să fie `700`.
+   Nu introduce parola în URL, JSON sau argumentele comenzilor. Păstrează o copie securizată.
+3. Alege un director existent și accesibil pentru restaurările de test, separat de
+   surse și repository. Pentru o destinație locală, directorul părinte al repository-ului
+   trebuie să existe și să fie accesibil la scriere.
+4. Verifică sursele selectate și acceptă limitarea la backupuri de fișiere.
+   Rulează **Save plan → Initialize repository** (o singură dată), apoi
+   **Back up now → List snapshots → Check all data → Test restore**.
+5. **Export setup** produce instrucțiuni pentru modul selectat. În modul direct exportă
+   `SETUP.md` și `backup-plan.json`, fără `agent.json` și fără parole.
+
+Utilizatorul din grupul DSM administrators poate intra prin SSH, dar acest lucru și
+dreptul `sudo -n docker` nu acordă automat acces la fișierele containerelor sau repository.
+Execuția directă folosește contul SSH, fără sudo automat, modificări ACL, chmod/chown
+recursive sau schimbări de sudoers. Configurează acces limitat la directoarele necesare.
+Serviciul User Home trebuie activat pentru a folosi directoarele homes; altfel alege
+o partajare dedicată, accesibilă contului. Vezi documentația Synology pentru
+[SSH](https://kb.synology.com/en-global/DSM/help/DSM/AdminCenter/system_terminal?version=7)
+și [User Home](https://kb.synology.com/en-uk/DSM/help/DSM/AdminCenter/file_user_advanced).
+
+Scriptul de preflight este trimis prin canalul SSH verificat, rulează cu `sh` POSIX
+și nu instalează servicii sau scripturi persistente. Verifică fișierul parolei,
+sursele și suprapunerile înainte de Restic; statusul 3 (backup incomplet) este tratat
+ca eșec. Restaurarea cere un snapshot exact și un director nou și folosește `--verify`.
+Un timeout SSH nu garantează oprirea procesului de pe NAS: verifică înainte de reîncercare.
+
+Pe NAS-ul de test s-au verificat doar în citire DSM **7.4**, x64 și utilitarele `sh`,
+`stat`, `readlink`, `id`. Restic nu a fost găsit în PATH sau în `/usr/local/bin/restic`,
+`/opt/bin/restic`, `/usr/bin/restic`. Nu s-au instalat fișiere și nu s-au creat backupuri
+pe NAS. Fluxul complet cu Restic real, pierderea sursei și două restaurări verificate
+a fost testat în laborator Linux cu `scripts/direct_restic_lab.py`.
+
+## Mod avansat: agentul Linux (opțional)
 
 Această etapă conectează interfața Slint la agentul Linux și motorul Restic existent.
 Poți salva sursele aprobate ale unui plan, vedea snapshoturile, verifica toate datele

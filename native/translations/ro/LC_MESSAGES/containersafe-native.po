@@ -4,6 +4,42 @@ msgstr ""
 "Language: ro\n"
 "Plural-Forms: nplurals=3; plural=(n == 1 ? 0 : (n == 0 || (n % 100 > 0 && n % 100 < 20)) ? 1 : 2);\n"
 
+msgid "This destination applies only to this plan. Save your changes before starting the backup."
+msgstr "Această destinație se aplică doar acestui plan. Salvează modificările înainte de pornirea backupului."
+
+msgid "Manual encrypted file backups over SSH. Database dumps and scheduling are not available yet."
+msgstr "Backupuri manuale criptate ale fișierelor prin SSH. Exporturile bazelor de date și programarea nu sunt disponibile încă."
+
+msgid "The Docker server sends encrypted backups to this PC over SFTP. Enable an SSH/SFTP server on the PC, configure key authentication and pin its host key in the SSH account's known_hosts."
+msgstr "Serverul Docker trimite backupurile criptate către acest PC prin SFTP. Activează un server SSH/SFTP pe PC, configurează autentificarea cu cheie și verifică cheia serverului în known_hosts al utilizatorului SSH."
+
+msgid "Use SFTP with a verified host key, or S3 over HTTPS. Configure S3 credentials in the SSH account's protected AWS credentials file. Never put passwords in the URL."
+msgstr "Folosește SFTP cu identitatea serverului verificată sau S3 prin HTTPS. Configurează datele S3 în fișierul AWS protejat al utilizatorului SSH. Nu pune parole în adresă."
+
+msgid "Backup execution"
+msgstr "Executarea backupului"
+
+msgid "Restic directly over SSH (recommended)"
+msgstr "Restic direct prin SSH (recomandat)"
+
+msgid "ContainerSafe Linux agent (advanced)"
+msgstr "Agent Linux ContainerSafe (avansat)"
+
+msgid "Backup paths must be absolute Linux paths"
+msgstr "Căile backupului trebuie să fie căi Linux absolute"
+
+msgid "Absolute folder on the NAS / Docker server"
+msgstr "Dosar absolut pe NAS / serverul Docker"
+
+msgid "SFTP address of this computer"
+msgstr "Adresa SFTP a acestui calculator"
+
+msgid "Remote repository address: SFTP or HTTPS S3"
+msgstr "Adresa depozitului extern: SFTP sau S3 HTTPS"
+
+msgid "No ContainerSafe agent is required. Install Restic on the NAS, create a password file with mode 600 and a separate restore folder. On DSM, Docker sudo access does not grant Restic access to files. Backup uses your SSH account without automatic sudo."
+msgstr "Nu este necesar un agent ContainerSafe. Instalează Restic pe NAS, creează un fișier pentru parolă cu permisiuni 600 și un dosar separat pentru restaurare. Pe DSM, accesul sudo la Docker nu acordă Restic acces la fișiere. Backupul folosește utilizatorul SSH, fără sudo automat."
+
 msgid "Destination incomplete or invalid; not saved yet."
 msgstr "Destinația este incompletă sau invalidă; nu a fost salvată încă."
 

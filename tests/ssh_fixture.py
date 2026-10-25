@@ -92,6 +92,25 @@ class Server(paramiko.ServerInterface):
     def check_channel_exec_request(self, channel, command):
         def execute():
             command_text = command.decode()
+            if command_text.startswith("sh -s --"):
+                argv = shlex.split(command_text)
+                assert argv[:3] == ["sh", "-s", "--"], argv
+                assert argv[4] in ("/fixture/restic 'literal; name", "/fixture/restic-incomplete"), argv
+                received = bytearray()
+                while True:
+                    part = channel.recv(8192)
+                    if not part:
+                        break
+                    received.extend(part)
+                    assert len(received) <= 65536
+                assert b"StrictHostKeyChecking=yes" in received
+                channel.send_stderr(b"private-fixture-marker\n")
+                incomplete = argv[4] == "/fixture/restic-incomplete"
+                channel.sendall(b"{}" if incomplete else b"[]")
+                channel.send_exit_status(3 if incomplete else 0)
+                channel.shutdown_write()
+                channel.close()
+                return
             if command_text.startswith("'/fixture/agent"):
                 argv = shlex.split(command_text)
                 request_data = bytearray()

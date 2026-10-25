@@ -1,4 +1,4 @@
-//! ContainerSafe Native UI. Development preview: no backup or restore operations.
+//! ContainerSafe Native UI: discovery, planning and manual file backup/restore.
 #![cfg_attr(
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"

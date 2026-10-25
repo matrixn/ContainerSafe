@@ -1,6 +1,8 @@
 pub mod agent;
 #[cfg(feature = "server-management")]
 pub mod backup;
+#[cfg(feature = "server-management")]
+pub mod direct_backup;
 pub mod plan;
 #[cfg(feature = "server-management")]
 pub mod preflight;
@@ -13,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[cfg(feature = "server-management")]
 pub mod servers;
-pub const VERSION: &str = "0.29";
+pub const VERSION: &str = "0.30";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {
