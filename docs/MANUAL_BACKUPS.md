@@ -1,4 +1,4 @@
-# ContainerSafe 0.34 — backupuri manuale de fișiere
+# ContainerSafe 0.35 — backupuri manuale și exporturi de baze de date
 
 Din 0.34 poți salva direct pe PC prin **This PC via SSH tunnel**, fără server SSH
 pe PC, sau poți descărca un export criptat prin **SFTP pull** ori **SSH binary streaming**.
@@ -60,9 +60,11 @@ a fost testat în laborator Linux cu `scripts/direct_restic_lab.py`.
 Această etapă conectează interfața Slint la agentul Linux și motorul Restic existent.
 Poți salva sursele aprobate ale unui plan, vedea snapshoturile, verifica toate datele
 și restaura un snapshot exact într-un director nou. Nu este încă recuperare completă
-a unui stack: exporturile PostgreSQL/MySQL/Redis, SQLite consistent, fișierele Compose,
-dependențele externe, programarea și retenția nu sunt implementate în acest flux.
-Un plan cu `Logical dump` selectat este refuzat, nu degradat la copierea volumului.
+a unui stack: fișierele Compose, dependențele externe, programarea și retenția rămân neimplementate.
+Din 0.35, `Logical dump` execută adaptoarele PostgreSQL, MariaDB/MySQL, Redis/Valkey,
+MongoDB replica set și SQLite etichetat explicit. Exporturile sunt pregătite de desktop
+înainte de Restic, inclusiv în modul agent și tunel PC. Citește [cerințele și recuperarea](DATABASE_BACKUPS.md).
+MySQL/MariaDB blochează scrierile pe durata exportului; importul bazelor rămâne manual.
 
 ## 1. Destinația implicită
 
@@ -174,5 +176,8 @@ Un backup parțial sau eșuat nu este afișat ca reușit.
   permisiuni, limite de ieșire și destinații cu verificare strictă SSH/HTTPS.
 - Nu s-au rulat backupuri pe NAS sau pe destinații externe reale S3/SFTP/PC.
 
-Următoarea etapă pentru backup complet de aplicație rămâne adaptorul PostgreSQL,
-cu restaurare într-un stack Docker izolat și verificare la nivel de aplicație.
+Următoarea etapă rămâne recuperarea coordonată a aplicației și importul automat
+într-un stack Docker izolat, cu verificare la nivel de aplicație. Exporturile din 0.35
+nu reprezintă automat o recuperare completă. Pentru test: selectează Logical dump,
+configurează planul, rulează Back up now, Check all data și Test restore, apoi importă
+exportul într-o instanță de test conform [ghidului](DATABASE_BACKUPS.md).

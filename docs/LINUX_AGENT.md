@@ -119,4 +119,9 @@ O cerere are maximum 64 KiB și trebuie urmată de EOF. Protocolul respinge câm
 
 ## Limitele acestei etape
 
-Agentul nu descoperă încă Docker, nu face dump PostgreSQL, nu programează backupuri și nu este conectat la butoanele interfeței desktop. Nu instalează nimic pe serverele existente. Următoarea etapă este un stack PostgreSQL fictiv, backup consistent și restaurare verificată la nivelul aplicației; abia apoi conectăm orchestrarea la interfață.
+Agentul nu descoperă Docker și nu pregătește singur exporturile bazelor de date.
+Desktopul îl orchestrează și, din 0.35, pregătește exporturile selectate înainte de
+Restic. Re-exportă configurația după activarea unui dump pentru a autoriza sursa
+privată temporară. Nu folosi apelul standalone Backup ca programator de dumpuri.
+Vezi [adaptoarele și recuperarea](DATABASE_BACKUPS.md). Programarea, retenția și
+recuperarea coordonată a aplicației rămân neimplementate.

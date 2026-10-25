@@ -51,6 +51,8 @@ struct DatabasePlan {
     container: String,
     engine: String,
     required_method: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    source_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -270,7 +272,7 @@ fn next_source_decision(current: &str, policy: &str) -> &'static str {
 }
 
 fn next_database_decision(current: &str, engine: &str) -> &'static str {
-    if engine == "PostgreSQL" {
+    if containersafe::database::supported(engine) {
         match current {
             "pending" => "logical_dump",
             "logical_dump" => "exclude",
@@ -377,7 +379,7 @@ fn backup_option_help(database: bool, policy: &str) -> String {
             "include" => lines.push(if policy == "large_data_requires_opt_in" {
                 "Include: explicitly add this large storage source to the plan. Review its size and destination capacity first. This does not start a backup."
             } else { "Include: add this persistent file source to the backup plan. This does not start a backup." }.into()),
-            "logical_dump" => lines.push("Logical dump: plan a consistent PostgreSQL database export instead of copying live database files. This saves the intended strategy; execution of the database adapter is not implemented yet.".into()),
+            "logical_dump" => lines.push("Logical dump: export the selected database before Restic encrypts it. PostgreSQL: all databases and roles, each database has its own snapshot. MySQL/MariaDB: all databases under a global read lock (writes wait). Redis/Valkey: RDB snapshot, no cluster support. MongoDB: full replica-set archive with oplog, no standalone/sharded support. SQLite: online backup of the explicitly labelled file. Required client tools and credentials must exist inside the container. No automatic database import.".into()),
             "exclude" => lines.push("Exclude: explicitly omit this item from the plan and mark the skip as reviewed. Unlike No backup, this is a deliberate selection decision.".into()),
             _ => {},
         }
@@ -649,7 +651,12 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
             unavailable_help: i18n::text(&unavailable_backup_help(true, &db.engine)).into(),
             row_index: (app.sources.len() + database_index) as i32,
             title: db.container.as_str().into(),
-            location: db.engine.as_str().into(),
+            location: if db.source_path.is_empty() {
+                db.engine.clone()
+            } else {
+                format!("{} · {}", db.engine, db.source_path)
+            }
+            .into(),
             detail: i18n::format("Adapter: {0} · not executable yet", &[&db.required_method])
                 .into(),
             decision: i18n::text(display_decision(decision)).into(),
@@ -659,7 +666,7 @@ fn render(ui: &ContainerSafeWindow, state: &State) {
                 .position(|value| *value == decision)
                 .unwrap_or(0) as i32,
             database: true,
-            caution: db.engine != "PostgreSQL",
+            caution: !containersafe::database::supported(&db.engine),
         });
     }
     let kind = ui.get_entry_kind();
@@ -1342,7 +1349,7 @@ mod tests {
         );
         assert_eq!(
             decision_values(true, "Redis/Valkey"),
-            ["pending", "exclude"]
+            ["pending", "logical_dump", "exclude"]
         );
     }
 
@@ -1356,6 +1363,7 @@ mod tests {
             container: "mysql".into(),
             engine: "MySQL".into(),
             required_method: "logical_dump".into(),
+            source_path: String::new(),
         });
         report.applications[3].sources.push(SourcePlan {
             path: "/fixture/raw-db".into(),
@@ -1367,11 +1375,13 @@ mod tests {
             container: "redis".into(),
             engine: "Redis/Valkey".into(),
             required_method: "manual_persistence_review".into(),
+            source_path: String::new(),
         });
         report.applications[5].databases.push(DatabasePlan {
             container: "pg".into(),
             engine: "PostgreSQL".into(),
             required_method: "logical_dump".into(),
+            source_path: String::new(),
         });
         report.applications[10].sources.push(SourcePlan {
             path: "/fixture/data".into(),
@@ -1397,10 +1407,15 @@ mod tests {
         let plans = plan_overview(&report, &selection);
         assert_eq!(
             plans.iter().map(|plan| plan.app_index).collect::<Vec<_>>(),
-            [1, 5]
+            [1, 4, 5]
         );
         selection.applications[1].sources[0].decision = "pending".into();
         selection.applications[5].databases[0].decision = "exclude".into();
+        selection.applications[4]
+            .databases
+            .last_mut()
+            .unwrap()
+            .decision = "exclude".into();
         assert!(plan_overview(&report, &selection).is_empty());
         let unavailable = BackupReport {
             schema_version: 1,
@@ -1425,8 +1440,21 @@ mod tests {
         );
         assert!(!source.contains("Logical dump:"));
         let database = backup_option_help(true, "PostgreSQL");
-        assert!(database.contains("Logical dump:") && database.contains("not implemented yet"));
-        for engine in ["Redis/Valkey", "MySQL", "MariaDB", "Unknown DB"] {
+        assert!(database.contains("Logical dump:") && database.contains("global read lock"));
+        for engine in [
+            "PostgreSQL",
+            "Redis/Valkey",
+            "MySQL",
+            "MariaDB",
+            "MongoDB",
+            "SQLite",
+        ] {
+            assert!(has_backup_method(true, engine));
+            assert!(unavailable_backup_help(true, engine).is_empty());
+            assert!(backup_option_help(true, engine).contains("Logical dump:"));
+        }
+        {
+            let engine = "Unknown DB";
             assert!(!has_backup_method(true, engine));
             assert!(!unavailable_backup_help(true, engine).is_empty());
             assert!(!backup_option_help(true, engine).contains("Include:"));
@@ -1454,12 +1482,15 @@ mod tests {
     }
 
     #[test]
-    fn postgres_dump_is_selectable_but_redis_dump_is_not() {
+    fn supported_database_dumps_are_selectable() {
         assert_eq!(
             next_database_decision("pending", "PostgreSQL"),
             "logical_dump"
         );
-        assert_eq!(next_database_decision("pending", "Redis/Valkey"), "exclude");
+        assert_eq!(
+            next_database_decision("pending", "Redis/Valkey"),
+            "logical_dump"
+        );
     }
 
     #[test]

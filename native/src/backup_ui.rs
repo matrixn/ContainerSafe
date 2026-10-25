@@ -128,12 +128,20 @@ fn approved_sources(
     app: &ApplicationPlan,
     selection: &ApplicationSelection,
 ) -> Result<Vec<PathBuf>, String> {
-    if selection
+    let mut databases = BTreeSet::new();
+    for db in selection
         .databases
         .iter()
-        .any(|db| db.decision == "logical_dump")
+        .filter(|d| d.decision == "logical_dump")
     {
-        return Err(i18n::text("Database dumps are not implemented yet. No backup was started. Choose a file-only plan or disable Logical dump explicitly."));
+        let known = app
+            .databases
+            .iter()
+            .find(|d| d.container == db.container)
+            .ok_or("Database inventory changed; refresh and review selections")?;
+        if !containersafe::database::supported(&known.engine) || !databases.insert(&db.container) {
+            return Err("Invalid database selection".into());
+        }
     }
     let mut sources = BTreeSet::new();
     for selected in selection
@@ -156,10 +164,52 @@ fn approved_sources(
         }
         sources.insert(PathBuf::from(&source.path));
     }
-    if sources.is_empty() {
+    if sources.is_empty() && databases.is_empty() {
         return Err(i18n::text("Select at least one file source with Include."));
     }
     Ok(sources.into_iter().collect())
+}
+
+fn database_binding(
+    app: &ApplicationPlan,
+    selection: &ApplicationSelection,
+) -> BTreeSet<(String, String, String)> {
+    app.databases
+        .iter()
+        .filter(|db| {
+            selection
+                .databases
+                .iter()
+                .any(|d| d.container == db.container && d.decision == "logical_dump")
+        })
+        .map(|db| {
+            (
+                db.container.clone(),
+                db.engine.clone(),
+                db.source_path.clone(),
+            )
+        })
+        .collect()
+}
+
+fn execution_sources(
+    app: &ApplicationPlan,
+    selection: &ApplicationSelection,
+    config: &PlanConfig,
+) -> Result<Vec<PathBuf>, String> {
+    let mut sources = approved_sources(app, selection)?;
+    if selection
+        .databases
+        .iter()
+        .any(|d| d.decision == "logical_dump")
+    {
+        sources.push(containersafe::database::staging_path(
+            &config.restore_root,
+            config.endpoint.job_id,
+        ));
+    }
+    sources.sort();
+    Ok(sources)
 }
 
 #[derive(Clone)]
@@ -234,8 +284,11 @@ key in that account's known_hosts. Use ~/.ssh/config aliases for ports/key paths
 For S3 HTTPS, configure the NAS SSH user's protected ~/.aws/credentials (mode 600).
 Never disable host identity or TLS verification. Credentials are not stored in this export.
 
-Only approved files are backed up. Logical database dumps and full application
-consistency are not provided. No running container is stopped or modified.
+Approved database exports are prepared by the desktop before Restic runs. The private
+containersafe-db-<job> source is temporary: never create it or reuse stale contents.
+Install the required database client inside each container; see docs/DATABASE_BACKUPS.md.
+No container is stopped. MySQL/MariaDB dumps hold a global read lock, blocking writes.
+Full application consistency and automatic database import are not provided.
 "#,
                 restic = config.restic,
                 password = config.password_file,
@@ -304,8 +357,10 @@ This contains no passwords. Review all paths before installing it on the Docker 
 
 Restores go to NEW directories under `{restores}` on the Docker server. No live data is replaced.
 File backups are not guaranteed to be consistent while applications write. SQLite and external
-databases require application-specific procedures. PostgreSQL/MySQL/Redis dumps, Compose recovery,
-scheduling and retention are not implemented by this file backup workflow.
+databases require application-specific procedures. The desktop prepares approved database dumps
+before invoking this agent; run the desktop for database plans, not standalone agent Backup.
+Do not pre-create or reuse a containersafe-db directory. Re-export after source changes.
+Compose recovery, database import, scheduling and retention are not implemented.
 Backups on the same disk are not protection against loss of that disk.
 "#,
             version = containersafe::VERSION,
@@ -469,7 +524,6 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
             else {
                 return;
             };
-            let sources = approved_sources(app, selection);
             let configs: Plans = match load(&plan_path(&root, server.id)) {
                 Ok(value) => value,
                 Err(error) => {
@@ -512,6 +566,7 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                 config.restore_root = format!("{home}/containersafe-restores");
                 config
             });
+            let sources = execution_sources(app, selection, &config);
             ui.set_backup_use_agent(config.use_agent);
             ui.set_backup_title(app.application.clone().into());
             ui.set_backup_sources(
@@ -597,8 +652,9 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         let Some(app) = guard.report.applications.iter().find(|a| a.application == plan.application) else { return; };
         let Some(selection) = guard.selection.applications.iter().find(|a| a.application == plan.application) else { return; };
         let selection = selection.clone();
-        let sources = match approved_sources(app, &selection) { Ok(value) => value, Err(error) => { show_result(&ui, Err(error)); return; } };
+        let database_binding = database_binding(app, &selection);
         plan.config = match read_form(&ui, &plan.config) { Ok(value) => value, Err(error) => { show_result(&ui, Err(error)); return; } };
+        let sources = match execution_sources(app, &selection, &plan.config) { Ok(value) => value, Err(error) => { show_result(&ui, Err(error)); return; } };
         if operation == "transfer-history" {
             let directory = storage::server_dir(&root,server.id).join("transfers/history");
             let result = (|| -> Result<String,String> {
@@ -657,9 +713,12 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
         let progress = Arc::new(Mutex::new(None::<TransferProgress>));
         let updates = progress.clone();
         let sink: ProgressSink = Arc::new(move |value| { if let Ok(mut latest) = updates.lock() { *latest = Some(value); } });
-        ui.set_backup_cancellable(plan.config.destination.kind == DestinationKind::LocalPcRepository || matches!(operation.as_str(), "download" | "resume"));
+        ui.set_backup_cancellable((plan.config.destination.kind == DestinationKind::LocalPcRepository && selection.databases.iter().all(|d| d.decision != "logical_dump")) || matches!(operation.as_str(), "download" | "resume"));
         guard.busy = true; ui.set_loading(true); ui.set_test_busy(true);
         ui.set_connection_step(i18n::text(match operation.as_str() { "backup" => "Checking sources and creating encrypted backup…", "init" => "Initializing encrypted repository…", "check" => "Reading and checking all repository data…", "restore" | "restore-local" => "Restoring to a new isolated directory…", "export-artifact" => "Preparing encrypted export…", "download" | "resume" => "Connecting for encrypted transfer…", "verify-local" => "Verifying integrity…", "mirror" => "Copying snapshots into PC repository…", _ => "Loading snapshots…" }).into());
+        if operation == "backup" && selection.databases.iter().any(|db| db.decision == "logical_dump") {
+            ui.set_connection_step(i18n::text("Exporting selected databases, then creating encrypted backup…").into());
+        }
         drop(guard);
         let state = state.clone(); let root = root.clone(); let weak = weak.clone(); let opened = opened.clone();
         // Rc stays on the UI thread; worker results are delivered through the event loop.
@@ -754,12 +813,23 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                     let result=result.map_err(|e|e.to_string())?;
                     return serde_json::to_value(result).map_err(|e| e.to_string());
                 }
+                let mut staged = None;
                 if matches!(action, Action::BackupSelected { .. }) {
                     let containers = containersafe::discover(&connection)?;
                     let current: BackupReport = serde_json::from_value(serde_json::to_value(containersafe::plan::build(&containers)).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
                     let app = current.applications.iter().find(|app| app.application == plan.application).ok_or_else(|| i18n::text("Inventory changed. Refresh and review your selections."))?;
-                    if approved_sources(app, &selection)? != sources { return Err(i18n::text("Inventory changed. Refresh and review your selections.")); }
+                    if database_binding != self::database_binding(app, &selection) { return Err(i18n::text("Inventory changed. Refresh and review your selections.")); }
+                    if execution_sources(app, &selection, &plan.config)? != sources { return Err(i18n::text("Inventory changed. Refresh and review your selections.")); }
+                    let specs = containersafe::database::specs(
+                        &serde_json::from_value(serde_json::to_value(app).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?,
+                        &serde_json::from_value(serde_json::to_value(&selection).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?, &containers)?;
+                    if !specs.is_empty() {
+                        staged = Some(containersafe::database::remote::StagedDumps::prepare(&connection,
+                            &containersafe::database::staging_path(&plan.config.restore_root, plan.config.endpoint.job_id),
+                            &specs, &sources, &plan.config.destination.location, &plan.config.password_file)?);
+                    }
                 }
+                let outcome = (|| {
                 if plan.config.destination.kind == DestinationKind::LocalPcRepository {
                     use containersafe::transfer::{pc_backup, reverse_tunnel::ReverseSession};
                     let session = ReverseSession::open(&connection, Path::new(&plan.config.rest_server),
@@ -781,6 +851,13 @@ pub(super) fn install(ui: &ContainerSafeWindow, root: PathBuf, state: SharedStat
                     return Err(i18n::text("Agent configuration differs from this plan. Export and install the updated setup; nothing was started."));
                 }
                 backup::call(&connection, &plan.config.endpoint, action, description.timeout_seconds.saturating_add(30).min(86400))
+                })();
+                if let Some(staged) = staged {
+                    if let Err(cleanup) = staged.finish() {
+                        return Err(match outcome { Ok(_) => format!("Backup completed, but {cleanup}"), Err(error) => format!("{error}\n{cleanup}") });
+                    }
+                }
+                outcome
             })();
             let _ = sender.send((result, root, server.id, plan.application, operation));
         });
@@ -1006,7 +1083,7 @@ mod tests {
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
     }
     #[test]
-    fn blocks_raw_databases_stale_paths_and_unimplemented_dumps() {
+    fn blocks_raw_databases_stale_paths_and_binds_database_only_sources() {
         let mut app = ApplicationPlan {
             application: "standalone/test".into(),
             status: String::new(),
@@ -1043,5 +1120,37 @@ mod tests {
             decision: "logical_dump".into(),
         });
         assert!(approved_sources(&app, &selected).is_err());
+        app.databases.push(DatabasePlan {
+            container: "postgres".into(),
+            engine: "PostgreSQL".into(),
+            required_method: "logical_dump".into(),
+            source_path: String::new(),
+        });
+        selected.sources[0].decision = "exclude".into();
+        let mut config = PlanConfig::new(Destination {
+            kind: DestinationKind::ServerFolder,
+            location: "/backups/db".into(),
+        });
+        config.restore_root = "/srv/restores".into();
+        let sources = execution_sources(&app, &selected, &config).unwrap();
+        assert_eq!(
+            sources,
+            vec![containersafe::database::staging_path(
+                &config.restore_root,
+                config.endpoint.job_id
+            )]
+        );
+        config.use_agent = true;
+        let directory = tempfile::tempdir().unwrap();
+        export_setup(&config, &sources, directory.path()).unwrap();
+        let folder = fs::read_dir(directory.path())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let exported: AgentConfig =
+            serde_json::from_slice(&fs::read(folder.join("agent.json")).unwrap()).unwrap();
+        assert_eq!(exported.jobs[0].sources, sources);
     }
 }

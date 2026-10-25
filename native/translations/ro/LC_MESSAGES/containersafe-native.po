@@ -1282,3 +1282,15 @@ msgstr "Se conectează pentru transferul criptat…"
 msgid "Copying snapshots into PC repository…"
 msgstr "Se copiază snapshoturile în depozitul de pe PC…"
 
+msgid "Approved files and selected database exports will be encrypted by Restic. Live database volumes remain excluded. MySQL/MariaDB exports block writes during the dump. Database imports are manual."
+msgstr "Fișierele aprobate și exporturile bazelor de date selectate vor fi criptate de Restic. Volumele bazelor de date active rămân excluse. Exporturile MySQL/MariaDB blochează scrierile pe durata exportului. Importul bazelor de date se face manual."
+
+msgid "Adapter: {0} · export before encrypted backup"
+msgstr "Adaptor: {0} · export înainte de backupul criptat"
+
+msgid "Logical dump: export the selected database before Restic encrypts it. PostgreSQL: all databases and roles, each database has its own snapshot. MySQL/MariaDB: all databases under a global read lock (writes wait). Redis/Valkey: RDB snapshot, no cluster support. MongoDB: full replica-set archive with oplog, no standalone/sharded support. SQLite: online backup of the explicitly labelled file. Required client tools and credentials must exist inside the container. No automatic database import."
+msgstr "Export logic: exportă baza selectată înainte de criptarea cu Restic. PostgreSQL: toate bazele și rolurile, fiecare bază având propriul instantaneu. MySQL/MariaDB: toate bazele sub blocare globală de citire (scrierile așteaptă). Redis/Valkey: instantaneu RDB, fără clustere. MongoDB: arhivă completă de replica set cu oplog, fără instanțe standalone sau sharded. SQLite: backup online al fișierului indicat explicit prin etichetă. Utilitarele și acreditările necesare trebuie să existe în container. Fără import automat."
+
+msgid "Exporting selected databases, then creating encrypted backup…"
+msgstr "Se exportă bazele de date selectate, apoi se creează backupul criptat…"
+

@@ -310,6 +310,10 @@ impl Connection {
         self.input_command(command, input, timeout_seconds, true, cancellation)
     }
 
+    pub(crate) fn docker_prefix(&self) -> &str {
+        self.docker_prefix
+    }
+
     pub(crate) fn restic_script(
         &self,
         script: &str,
@@ -397,6 +401,17 @@ impl Connection {
                         73 => "Unsafe restore directory: choose a separate existing folder outside sources and repository",
                         74 => "Repository already contains files; do not initialize it again",
                         75 => "Remote path unavailable or access denied. DSM administrator/Docker sudo access does not automatically grant file permissions",
+                        80 => "Database staging is unsafe or inaccessible. Use a canonical SSH-owned restore folder outside sources and repository",
+                        81 => "Database export directory already exists. Another backup may be running or private partial dumps remain; inspect before retrying",
+                        82 => "Database export failed. Check in-container client tools, credentials and privileges; MongoDB requires a replica set, Redis cluster is unsupported. No backup was started",
+                        85 => "PostgreSQL export failed. Check pg_dumpall, local port 5432, POSTGRES_USER/PGUSER, password or _FILE credentials and cluster-wide privileges. No backup was started",
+                        86 => "MariaDB export failed. Check mariadb-dump, local port 3306, root credentials and global read-lock privileges. No backup was started",
+                        87 => "MySQL export failed. Check mysqldump, local port 3306, root credentials and global read-lock privileges. No backup was started",
+                        88 => "Redis/Valkey export failed. Check redis-cli/valkey-cli, local port 6379, REDISCLI_AUTH or REDIS_PASSWORD/_FILE and replication/INFO privileges. Cluster mode is unsupported",
+                        89 => "MongoDB export failed. Requires mongosh, mongodump, a local replica-set member on port 27017, and a protected password-only CONTAINERSAFE_MONGO_CONFIG when authentication is enabled. Standalone and sharded servers are unsupported",
+                        90 => "SQLite export failed. Requires sqlite3, a readable regular containersafe.sqlite.path file and writable container /tmp. Online backup and quick_check must succeed",
+                        83 => "Database export interrupted. Inspect private staging and container temporary files before retrying",
+                        84 => "Database export cleanup failed; private plaintext dumps may remain on the server",
                         76 => "Required NAS utilities unavailable: sh, stat, readlink and id are required",
                         _ => "Restic failed. Check repository access, source permissions and destination credentials on the NAS",
                     }.to_string()),

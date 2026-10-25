@@ -2,6 +2,16 @@
 
 The project is in active prototype development. These are implementation milestones, not official supported releases.
 
+## 0.35 — 2026-10-25
+
+- Execute PostgreSQL, MariaDB/MySQL, Redis/Valkey, MongoDB replica-set and explicitly labelled SQLite database exports before encrypted Restic backups. Support database-only plans and preserve protected raw-volume policies.
+- Bind selected engines and SQLite file paths to refreshed inventory, then execute only full running container IDs through the existing pinned SSH/Docker access method. Keep database credentials inside the container and expose typed, engine-specific errors without raw stderr.
+- Prepare exports in an exclusively created SSH-owned mode-700 directory, add a recovery manifest, reject stale stages and unsafe overlap, and explicitly report cleanup failures after successful or failed Restic operations. No automatic privilege elevation, host-key bypass, container stop, live overwrite or Restic unlock.
+- Support the same desktop preparation with direct Restic, optional configured Linux-agent execution and reverse-tunnel PC destinations. Re-export agent setup after enabling database sources. Hide cancellation for database plans because terminating remote dump descendants is not guaranteed.
+- Document consistency boundaries: PostgreSQL is consistent per database, MySQL/MariaDB holds a global read lock and blocks writes, Redis Cluster and MongoDB standalone/sharded are rejected, SQLite needs an explicit file label. Database imports remain manual; a Restic file restore is not application recovery.
+- Add a disposable Linux Docker/Restic fixture for real exports, encrypted snapshots, full-data checks, byte-verified isolated restores and native-client record verification. Root/native tests, Clippy, agent-without-server-management check, Windows native build, version and 430-entry translation validation passed. Live DSM/database GUI execution and the existing SSH/PC transfer suites were not rerun for this milestone.
+- Update README, database setup/recovery and manual/agent instructions, plus the source-derived Wiki. No new tag is created by this milestone's branch-only publication.
+
 ## 0.34 — 2026-10-25
 
 - Integrate independent execution, PC destination and SFTP/stream transfer choices in the Slint backup plan. Preserve legacy SFTP push destinations and migrate old plans with defaults for new fields.

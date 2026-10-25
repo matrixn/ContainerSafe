@@ -1,4 +1,4 @@
-use crate::{detect_database, is_backup_candidate, Container};
+use crate::{is_backup_candidate, Container};
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -33,11 +33,13 @@ pub struct DatabasePlan {
     pub container: String,
     pub engine: String,
     pub required_method: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source_path: String,
 }
 
 fn classify_source(image: &str, path: &str) -> &'static str {
-    match detect_database(image) {
-        Some("PostgreSQL" | "MariaDB" | "MySQL") => "requires_logical_dump",
+    match crate::detect_database(image) {
+        Some("PostgreSQL" | "MariaDB" | "MySQL" | "MongoDB" | "SQLite") => "requires_logical_dump",
         Some("Redis/Valkey") => "requires_persistence_review",
         _ if path.starts_with("/volume1/Media/") || path == "/volume1/RuTorrent" => {
             "large_data_requires_opt_in"
@@ -92,10 +94,11 @@ pub fn build(containers: &[Container]) -> BackupReport {
                 ));
             }
 
-            if let Some(engine) = detect_database(&container.config.image) {
+            if let Some(engine) = crate::database::container_engine(container) {
                 let required_method = match engine {
-                    "PostgreSQL" | "MariaDB" | "MySQL" => "logical_dump",
-                    "Redis/Valkey" => "manual_persistence_review",
+                    "PostgreSQL" | "MariaDB" | "MySQL" | "MongoDB" | "SQLite" | "Redis/Valkey" => {
+                        "logical_dump"
+                    }
                     _ => "manual_review",
                 };
 
@@ -103,6 +106,17 @@ pub fn build(containers: &[Container]) -> BackupReport {
                     container: name.to_string(),
                     engine: engine.to_string(),
                     required_method: required_method.to_string(),
+                    source_path: if engine == "SQLite" {
+                        container
+                            .config
+                            .labels
+                            .as_ref()
+                            .and_then(|l| l.get("containersafe.sqlite.path"))
+                            .cloned()
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    },
                 });
             }
 
@@ -116,7 +130,11 @@ pub fn build(containers: &[Container]) -> BackupReport {
                     continue;
                 }
 
-                let policy = classify_source(&container.config.image, &mount.source);
+                let policy = if crate::database::container_engine(container) == Some("SQLite") {
+                    "requires_logical_dump"
+                } else {
+                    classify_source(&container.config.image, &mount.source)
+                };
 
                 let candidate = SourcePlan {
                     path: mount.source.clone(),

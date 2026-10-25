@@ -148,7 +148,7 @@ pub fn run(
             if db.decision == "logical_dump" {
                 println!();
                 println!("[DATABASE] {}", db.container);
-                println!("  [BLOCK] Logical dump adapter not implemented");
+                println!("  [BLOCK] Database export preflight is not executed by this read-only CLI; use the desktop and review adapter requirements");
                 blocked += 1;
             }
         }

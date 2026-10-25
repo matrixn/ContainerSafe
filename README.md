@@ -4,7 +4,7 @@
 
 ### Discover. Audit. Protect. Recover.
 
-**Version 0.34** · Next releases increment by **0.01** (0.35, 0.36, …).
+**Version 0.35** · Next releases increment by **0.01** (0.36, 0.37, …).
 
 **Know what your Docker applications depend on — before you need to restore them.**
 
@@ -25,7 +25,7 @@ ContainerSafe is an early-stage **Rust-powered Docker backup readiness and recov
 </div>
 
 > [!IMPORTANT]
-> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. Manual encrypted **file backups directly over SSH** are available in Backup plans after installing Restic on the server. The ContainerSafe agent is optional. Database-consistent snapshots, scheduling and full-stack recovery are **not implemented or validated**. See [manual backup setup](docs/MANUAL_BACKUPS.md). Keep using your established backup strategy.
+> **Developer preview, not a production backup solution.** Docker discovery, backup planning, selection validation, and limited preflight checks have been demonstrated. Manual encrypted **file backups directly over SSH** are available in Backup plans after installing Restic on the server. The ContainerSafe agent is optional. Manual database export adapters are available with engine-specific limits; scheduling and full-stack recovery remain **unimplemented**. Read [database backup setup and recovery](docs/DATABASE_BACKUPS.md) before selecting a dump. See [manual backup setup](docs/MANUAL_BACKUPS.md). Keep using your established backup strategy.
 
 ## Why ContainerSafe?
 
@@ -47,7 +47,7 @@ ContainerSafe aims to make these dependencies **visible, reviewable, and recover
 | Docker container discovery | ✅ Tested | Lists running and stopped containers over SSH |
 | Compose project grouping | ✅ Tested | Uses Docker Compose labels; standalone containers are separate |
 | Bind mount & named volume inventory | ✅ Tested | Classifies candidate sources, without assuming completeness |
-| Database risk detection | ✅ Basic | Recognizes common PostgreSQL / MySQL / MariaDB / Redis image patterns |
+| Database risk detection | ✅ Basic | PostgreSQL / MySQL / MariaDB / Redis / Valkey / MongoDB image patterns; explicit SQLite labels |
 | Backup readiness audit | ✅ Basic | Flags missing configuration and consistency requirements |
 | Backup plan JSON | ✅ Tested | Generates a schema-versioned, read-only proposal |
 | Explicit include/exclude/dump selection | ✅ Tested | Requires decisions; prevents naive raw PostgreSQL volume selection |
@@ -56,6 +56,7 @@ ContainerSafe aims to make these dependencies **visible, reviewable, and recover
 | Restic lab: init, backup, integrity check, restore | ✅ Local test | Disposable Windows test data only; two-snapshot test passed |
 | Native Slint UI | 🧪 Preview | Manages SSH servers and uses the shared Rust core for discovery/validation |
 | Startup splash / stage status | 🧪 Preview | Slint screen with real startup steps, not fake loading animation |
+| Manual database export adapters | 🧪 Preview | PostgreSQL, MariaDB/MySQL, Redis/Valkey, MongoDB replica sets and labelled SQLite; [requirements and recovery](docs/DATABASE_BACKUPS.md) |
 | Manual encrypted file backup | ✅ Tested in isolated fixtures | Direct Restic over verified SSH or optional configured Linux agent |
 | SFTP pull to PC | ✅ Windows/Linux fixture | Immutable encrypted export, SHA-256 readback, explicit resume |
 | Binary SSH streaming to PC | ✅ Windows/Linux fixture | Framed binary payload, exact length/digest/completion; retry from start |
@@ -85,7 +86,7 @@ ContainerSafe (Rust)
 
 ```
 
-The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. Direct Restic-over-SSH and the optional Linux agent support manual file backup/restore through the desktop; production database orchestration remains future work.
+The CLI and desktop share the root `containersafe` Rust library: server identities, SSH, profile storage, Docker plans and validation. Direct Restic-over-SSH and the optional Linux agent support manual file backup/restore through the desktop; database exports are prepared by the desktop before Restic runs; coordinated application recovery remains future work.
 
 ## Getting started
 
@@ -149,7 +150,7 @@ cargo run --locked -- lab-backup --restic C:\Users\radut\bin\restic.exe
 
 ## Example workflow
 
-The Linux `containersafe-agent` binary now exposes versioned JSON requests over stdin/stdout for configured local jobs. It reuses the Restic engine and requires explicit operation permissions and private password files. See [agent setup and disposable Linux testing](docs/LINUX_AGENT.md). Desktop-to-agent orchestration and consistent database backups are subsequent milestones.
+The Linux `containersafe-agent` binary now exposes versioned JSON requests over stdin/stdout for configured local jobs. It reuses the Restic engine and requires explicit operation permissions and private password files. See [agent setup and disposable Linux testing](docs/LINUX_AGENT.md). Desktop-to-agent orchestration is implemented. Database exports are desktop-prepared; re-export the agent setup for a changed database selection. Standalone agent invocation is not a database scheduler.
 
 ```text
 1. Discover Docker services
@@ -179,7 +180,9 @@ The Linux `containersafe-agent` binary now exposes versioned JSON requests over 
 - [x] Manual file backup/restore over pinned SSH, with optional desktop-to-agent transport
 - [ ] Docker/database orchestration with least-privilege considerations
 - [ ] Complete preflight: paths, permissions, size, Compose files, external dependencies
-- [ ] PostgreSQL-consistent backup adapter and disposable integration tests
+- [x] Native database-export adapters and disposable Docker/Restic integration fixture
+- [x] PostgreSQL, MariaDB/MySQL, Redis/Valkey, MongoDB replica-set and explicitly labelled SQLite selections
+- [ ] Automated database import/restore validation in the desktop and coordinated multi-service snapshots
 - [x] Default backup destinations and per-plan overrides (server folder, SFTP, HTTPS S3, PC reverse tunnel)
 - [x] English/Romanian preferences, autosave, explicit opt-in reconnect and ten loading animations
 - [x] Light interface, Compose tree, backup plans filtered to enabled selections, per-row server actions
@@ -199,6 +202,28 @@ The Linux `containersafe-agent` binary now exposes versioned JSON requests over 
 - [ ] Live Linux desktop transfer validation and macOS build/package support (Windows MSI and Linux packaging workflow already exists)
 
 Suggestions and use cases are welcome in [GitHub Issues](https://github.com/matrixn/ContainerSafe/issues).
+
+## Database backups (0.35)
+
+Select **Logical dump** on a database entry in **Containers**, then configure its
+**Backup plans** entry and use **Back up now**. Database-only plans are supported.
+The desktop refreshes inventory, binds full running container IDs, exports into an
+exclusive private server directory, lets Restic encrypt the exports with approved
+ordinary files, and requests cleanup after success or failure. A failed export
+prevents the Restic backup from starting; stale exports are never reused.
+
+- PostgreSQL: all databases/roles using `pg_dumpall`; one snapshot per database.
+- MariaDB/MySQL: all databases under a **global read lock**; writes wait during export.
+- Redis/Valkey: fresh RDB snapshot through native replication; clusters are rejected.
+- MongoDB: full replica-set archive with oplog; standalone/sharded are unsupported.
+- SQLite: online `.backup` and `quick_check` for an explicitly labelled file.
+
+Client tools and credentials must exist inside the container. Temporary exports
+are plaintext in a private directory before Restic encryption; disconnects can
+require manual cleanup. No database passwords are fetched into the UI and no
+live database volume is copied generically. **Test restore** verifies restored
+files; database import is manual. See [setup, credential conventions, DSM notes,
+recovery and the Docker integration lab](docs/DATABASE_BACKUPS.md).
 
 ## Backups and transfers to this PC (0.31–0.34)
 
@@ -251,8 +276,9 @@ See [transfer architecture, validation and limitations](docs/PC_TRANSFERS.md) an
 
 The integration suite uses disposable Linux SSH/Restic data and Windows Restic.
 These results do not establish production DSM backup compatibility for every share,
-ACL or application. Raw live database volumes remain blocked. There are no database
-logical dumps, application consistency guarantees, automatic schedules or retention.
+ACL or application. Raw live database volumes remain blocked. There are no
+application consistency guarantees, automatic schedules or retention. Database dump
+adapters were added in 0.35 with explicit limits; see [database backups](docs/DATABASE_BACKUPS.md).
 Cancellation cannot guarantee that every remote descendant has exited; after an
 interruption inspect snapshots/locks, then retry. No automatic `unlock`, prune or
 live-data restore is performed. Local verification uses the saved pinned server identity and its local binding;

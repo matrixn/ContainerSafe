@@ -139,7 +139,7 @@ pub fn validate(report: &BackupReport, selection: &BackupSelection) -> Vec<Strin
             };
 
             match selected.decision.as_str() {
-                "logical_dump" if db.engine == "PostgreSQL" => {
+                "logical_dump" if crate::database::supported(&db.engine) => {
                     selected_count += 1;
                 }
                 "exclude" => {}

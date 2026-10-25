@@ -1,6 +1,7 @@
 pub mod agent;
 #[cfg(feature = "server-management")]
 pub mod backup;
+pub mod database;
 #[cfg(feature = "server-management")]
 pub mod direct_backup;
 pub mod plan;
@@ -17,7 +18,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[cfg(feature = "server-management")]
 pub mod servers;
-pub const VERSION: &str = "0.34";
+pub const VERSION: &str = "0.35";
 
 #[derive(Debug, Deserialize)]
 pub struct Container {
@@ -164,6 +165,8 @@ fn detect_database(image: &str) -> Option<&'static str> {
         Some("MariaDB")
     } else if image.contains("mysql") {
         Some("MySQL")
+    } else if image.contains("mongo") {
+        Some("MongoDB")
     } else if image.contains("redis") || image.contains("valkey") {
         Some("Redis/Valkey")
     } else {

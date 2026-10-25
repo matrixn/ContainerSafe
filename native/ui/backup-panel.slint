@@ -52,7 +52,7 @@ export component BackupPanel inherits Rectangle {
         Text { text: @tr("Manual backup") + " · " + root.title; color: Theme.ink; font-size: 20px; font-weight: 700; overflow: elide; }
         ScrollView {
             VerticalLayout { spacing: 12px;
-                SelectableText { text: @tr("Only the approved files below will be saved. Database logical dumps are not available in this version. Do not include live database volumes."); text-color: #976b20; wrap: word-wrap; }
+                SelectableText { text: @tr("Approved files and selected database exports will be encrypted by Restic. Live database volumes remain excluded. MySQL/MariaDB exports block writes during the dump. Database imports are manual."); text-color: #976b20; wrap: word-wrap; }
                 SelectableText { text: root.sources; text-color: Theme.muted; wrap: word-wrap; }
                 BackupDestinationSettings { default-mode: false; agent-mode: root.use-agent; kind <=> root.kind; location <=> root.location; }
                 if root.kind == 3 : HorizontalLayout { spacing: 12px;
